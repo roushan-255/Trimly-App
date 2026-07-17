@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  SHOP_OWNER
+  BARBER
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum TimeSlotStatus {
+  AVAILABLE
+  BOOKED
+  BLOCKED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  firstName    String
+  lastName     String
+  phone        String?  @unique
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedShops   Shop[]       @relation("ShopOwner")
+  barberProfile Barber?
+  appointments Appointment[] @relation("CustomerAppointments")
+  reviews      Review[]      @relation("CustomerReviews")
+}
+
+model Shop {
+  id          String   @id @default(uuid()) @db.Uuid
+  ownerId     String   @db.Uuid
+  name        String
+  description String?
+  phone       String?
+  email       String?
+  addressLine1 String
+  addressLine2 String?
+  city        String
+  state       String?
+  postalCode  String
+  country     String
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner        User          @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  barbers      Barber[]
+  services     Service[]
+  appointments Appointment[]
+  reviews      Review[]
+
+  @@index([ownerId])
+  @@index([city])
+}
+
+model Barber {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @unique @db.Uuid
+  shopId      String   @db.Uuid
+  displayName String
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shop            Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  timeSlots       TimeSlot[]
+  appointments    Appointment[]
+  reviews         Review[]
+  portfolioImages PortfolioImage[]
+
+  @@index([shopId])
+}
+
+model Service {
+  id          String   @id @default(uuid()) @db.Uuid
+  shopId      String   @db.Uuid
+  name        String
+  description String?
+  durationMin Int
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([shopId])
+}
+
+model TimeSlot {
+  id        String         @id @default(uuid()) @db.Uuid
+  barberId  String         @db.Uuid
+  startsAt  DateTime
+  endsAt    DateTime
+  status    TimeSlotStatus @default(AVAILABLE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  barber      Barber       @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  appointment Appointment?
+
+  @@unique([barberId, startsAt])
+  @@index([barberId, startsAt])
+}
+
+model Appointment {
+  id         String            @id @default(uuid()) @db.Uuid
+  customerId String            @db.Uuid
+  shopId     String            @db.Uuid
+  barberId   String            @db.Uuid
+  serviceId  String            @db.Uuid
+  timeSlotId String            @unique @db.Uuid
+  status     AppointmentStatus @default(PENDING)
+  notes      String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  customer User     @relation("CustomerAppointments", fields: [customerId], references: [id], onDelete: Restrict)
+  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  barber   Barber   @relation(fields: [barberId], references: [id], onDelete: Restrict)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  timeSlot TimeSlot @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
+  review   Review?
+
+  @@index([customerId, createdAt])
+  @@index([shopId, status])
+  @@index([barberId, status])
+}
+
+model Review {
+  id            String   @id @default(uuid()) @db.Uuid
+  customerId    String   @db.Uuid
+  shopId        String   @db.Uuid
+  barberId      String?  @db.Uuid
+  appointmentId String   @unique @db.Uuid
+  rating        Int
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customer    User        @relation("CustomerReviews", fields: [customerId], references: [id], onDelete: Restrict)
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  barber      Barber?     @relation(fields: [barberId], references: [id], onDelete: SetNull)
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, createdAt])
+  @@index([barberId, createdAt])
+}
+
+model PortfolioImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  barberId  String   @db.Uuid
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@index([barberId, sortOrder])
+}

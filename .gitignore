@@ -1,0 +1,22 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+.next/
+dist/
+coverage/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs and local tooling
+*.log
+.DS_Store
+.turbo/
+.swc/
+*.tsbuildinfo
+
+# Prisma
+backend/prisma/migrations/
