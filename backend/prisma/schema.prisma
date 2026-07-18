@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum UserRole {
@@ -28,36 +29,42 @@ enum TimeSlotStatus {
   BLOCKED
 }
 
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   passwordHash String
   role         UserRole
+  refreshTokenHash      String?
+  refreshTokenExpiresAt DateTime?
 
-  isVerified   Boolean  @default(false)
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   customerProfile CustomerProfile?
   ownerProfile    ShopOwnerProfile?
   adminProfile    AdminProfile?
+  barberProfile   Barber?
 }
 
-
 model CustomerProfile {
-
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @db.Uuid
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
 
   firstName String
   lastName  String
 
-  phone     String?
+  phone String?
 
-  avatar    String?
+  avatar String?
 
-  walletBalance Decimal @default(0) @db.Decimal(10,2)
+  walletBalance Decimal @default(0) @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -102,29 +109,31 @@ model AdminProfile {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
 model Shop {
-  id          String   @id @default(uuid()) @db.Uuid
-  ownerId     String   @db.Uuid
-  name        String
-  description String?
-  phone       String?
-  email       String?
+  id           String   @id @default(uuid()) @db.Uuid
+  ownerId      String   @db.Uuid
+  name         String
+  description  String?
+  phone        String?
+  email        String?
   addressLine1 String
   addressLine2 String?
-  city        String
-  state       String?
-  postalCode  String
-  country     String
-  latitude    Decimal? @db.Decimal(9, 6)
-  longitude   Decimal? @db.Decimal(9, 6)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  city         String
+  state        String?
+  postalCode   String
+  country      String
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  owner        User          @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  owner        ShopOwnerProfile @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   barbers      Barber[]
   services     Service[]
   appointments Appointment[]
   reviews      Review[]
+  favoritedBy  FavoriteShop[]
 
   @@index([ownerId])
   @@index([city])
@@ -145,6 +154,7 @@ model Barber {
   appointments    Appointment[]
   reviews         Review[]
   portfolioImages PortfolioImage[]
+  favoritedBy     FavoriteBarber[]
 
   @@index([shopId])
 }
@@ -161,6 +171,7 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
 
   @@index([shopId])
 }
@@ -193,11 +204,11 @@ model Appointment {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
-  customer User     @relation("CustomerAppointments", fields: [customerId], references: [id], onDelete: Restrict)
-  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  barber   Barber   @relation(fields: [barberId], references: [id], onDelete: Restrict)
-  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  timeSlot TimeSlot @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  shop     Shop            @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  barber   Barber          @relation(fields: [barberId], references: [id], onDelete: Restrict)
+  service  Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  timeSlot TimeSlot        @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
   review   Review?
 
   @@index([customerId, createdAt])
@@ -216,10 +227,10 @@ model Review {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  customer    User        @relation("CustomerReviews", fields: [customerId], references: [id], onDelete: Restrict)
-  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  barber      Barber?     @relation(fields: [barberId], references: [id], onDelete: SetNull)
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  barber      Barber?         @relation(fields: [barberId], references: [id], onDelete: SetNull)
+  appointment Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   @@index([shopId, createdAt])
   @@index([barberId, createdAt])
@@ -237,4 +248,48 @@ model PortfolioImage {
   barber Barber @relation(fields: [barberId], references: [id], onDelete: Cascade)
 
   @@index([barberId, sortOrder])
+}
+
+model FavoriteBarber {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  barberId   String   @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  barber   Barber          @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, barberId])
+  @@index([barberId])
+}
+
+model FavoriteShop {
+  id         String   @id @default(uuid()) @db.Uuid
+  customerId String   @db.Uuid
+  shopId     String   @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  shop     Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, shopId])
+  @@index([shopId])
+}
+
+model PayoutAccount {
+  id                String   @id @default(uuid()) @db.Uuid
+  ownerId           String   @db.Uuid
+  accountHolderName String
+  bankName          String
+  accountNumber     String
+  ifscCode          String
+  isPrimary         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner ShopOwnerProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
 }
