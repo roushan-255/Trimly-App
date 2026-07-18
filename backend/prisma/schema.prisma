@@ -31,19 +31,77 @@ enum TimeSlotStatus {
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
-  firstName    String
-  lastName     String
-  phone        String?  @unique
-  role         UserRole @default(CUSTOMER)
+  passwordHash String
+  role         UserRole
+
+  isVerified   Boolean  @default(false)
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  ownedShops   Shop[]       @relation("ShopOwner")
-  barberProfile Barber?
-  appointments Appointment[] @relation("CustomerAppointments")
-  reviews      Review[]      @relation("CustomerReviews")
+  customerProfile CustomerProfile?
+  ownerProfile    ShopOwnerProfile?
+  adminProfile    AdminProfile?
 }
 
+
+model CustomerProfile {
+
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+
+  firstName String
+  lastName  String
+
+  phone     String?
+
+  avatar    String?
+
+  walletBalance Decimal @default(0) @db.Decimal(10,2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appointments Appointment[]
+  reviews      Review[]
+
+  favoriteBarbers FavoriteBarber[]
+  favoriteShops   FavoriteShop[]
+}
+
+model ShopOwnerProfile {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @db.Uuid
+  firstName         String
+  lastName          String
+  avatarUrl         String?
+  businessLegalName String?
+  gstin             String?   @unique
+  panNumber         String?   @unique
+  kycStatus         KycStatus @default(NOT_SUBMITTED)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shops          Shop[]
+  payoutAccounts PayoutAccount[]
+}
+
+model AdminProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  firstName   String
+  lastName    String
+  avatarUrl   String?
+  designation String?
+  department  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 model Shop {
   id          String   @id @default(uuid()) @db.Uuid
   ownerId     String   @db.Uuid
@@ -103,7 +161,6 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
 
   @@index([shopId])
 }
