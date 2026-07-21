@@ -13,14 +13,60 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { AuthApiError, login, LoginResponse } from '@/lib/auth';
+
+type FormStatus = {
+  kind: 'idle' | 'error' | 'success';
+  message: string;
+};
+
+const ACCESS_TOKEN_KEY = 'trimly.accessToken';
+const USER_KEY = 'trimly.user';
+
+function storeSession(auth: LoginResponse, remember: boolean) {
+  const selectedStorage = remember ? localStorage : sessionStorage;
+  const otherStorage = remember ? sessionStorage : localStorage;
+
+  otherStorage.removeItem(ACCESS_TOKEN_KEY);
+  otherStorage.removeItem(USER_KEY);
+  selectedStorage.setItem(ACCESS_TOKEN_KEY, auth.accessToken);
+  selectedStorage.setItem(USER_KEY, JSON.stringify(auth.user));
+}
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [status, setStatus] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState<FormStatus>({ kind: 'idle', message: '' });
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus('The login screen is ready. Connect the authentication API to sign in.');
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get('email') ?? '').trim().toLowerCase();
+    const password = String(form.get('password') ?? '');
+    const remember = form.get('remember') === 'on';
+
+    setIsSubmitting(true);
+    setStatus({ kind: 'idle', message: '' });
+
+    try {
+      const auth = await login({ email, password });
+      storeSession(auth, remember);
+      const role = auth.user.role.toLowerCase().replace('_', ' ');
+
+      setStatus({
+        kind: 'success',
+        message: `Signed in successfully as ${role}.`,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof AuthApiError
+          ? error.message
+          : 'Unable to reach the server. Check that the backend is running.';
+
+      setStatus({ kind: 'error', message });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -75,7 +121,7 @@ export default function LoginPage() {
             <p>Enter your details to manage your bookings and account.</p>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
             <div className="field-group">
               <label htmlFor="email">Email address</label>
               <input
@@ -122,11 +168,18 @@ export default function LoginPage() {
               <span>Keep me signed in</span>
             </label>
 
-            <button className="submit-button" type="submit">
-              Sign in <ArrowRight aria-hidden="true" />
+            <button className="submit-button" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {!isSubmitting && <ArrowRight aria-hidden="true" />}
             </button>
 
-            <p className="form-status" role="status" aria-live="polite">{status}</p>
+            <p
+              className={`form-status form-status-${status.kind}`}
+              role={status.kind === 'error' ? 'alert' : 'status'}
+              aria-live="polite"
+            >
+              {status.message}
+            </p>
           </form>
 
           <p className="signup-copy">New to Trimly? <Link href="/sign-up">Create an account</Link></p>

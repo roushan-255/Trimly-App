@@ -29,12 +29,22 @@ The frontend reads its API origin from `NEXT_PUBLIC_API_URL` and defaults to
 
 ```bash
 cp backend/.env.example backend/.env
-# Set DATABASE_URL in backend/.env
+# Set DATABASE_URL and JWT_ACCESS_SECRET in backend/.env
 corepack pnpm --dir backend prisma:generate
+corepack pnpm --dir backend exec prisma migrate deploy
+corepack pnpm --dir backend start:dev
 ```
 
-The authentication endpoints still need to be implemented before the login form
-can create a real session.
+The MVP authentication routes are:
+
+- `POST /auth/signup/customer`
+- `POST /auth/signup/shop-owner`
+- `POST /auth/signup/barber`
+- `POST /auth/signup/admin`
+- `POST /auth/login`
+
+Barber signup requires the UUID of an existing shop. Admin signup is intentionally
+public for the initial MVP and must be protected or removed before production.
 
 ## Commands
 

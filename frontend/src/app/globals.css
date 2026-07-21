@@ -332,8 +332,16 @@ form { display: grid; }
 .submit-button:focus-visible { outline: 3px solid rgba(76, 155, 126, 0.32); outline-offset: 3px; }
 .submit-button svg { width: 18px; transition: transform 160ms ease; }
 .submit-button:hover svg { transform: translateX(3px); }
+.submit-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
 
 .form-status { min-height: 20px; margin: 10px 0 0; color: #476456; font-size: 12px; line-height: 1.5; text-align: center; }
+.form-status-error { color: #b42318; }
+.form-status-success { color: #287258; }
 .signup-copy { margin: 21px 0 0; color: #646c79; font-size: 14px; text-align: center; }
 .terms-copy { margin: 25px auto 0; max-width: 360px; color: #9097a0; font-size: 10px; line-height: 1.6; text-align: center; }
 .terms-copy a { text-underline-offset: 2px; }

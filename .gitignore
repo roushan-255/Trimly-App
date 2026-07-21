@@ -19,4 +19,4 @@ coverage/
 *.tsbuildinfo
 
 # Prisma
-backend/prisma/migrations/
+backend/src/generated/prisma/
