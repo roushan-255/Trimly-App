@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/components/auth/auth-provider';
 
 export const metadata: Metadata = {
-  title: 'Sign in | Trimly',
-  description: 'Sign in to Trimly to book barbers and manage your appointments.',
+  title: 'Trimly | Find your next great barber shop',
+  description: 'Discover top-rated barber shops and book your preferred slot in seconds.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><AuthProvider>{children}</AuthProvider></body></html>;
 }

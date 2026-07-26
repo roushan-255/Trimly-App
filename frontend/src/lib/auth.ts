@@ -19,6 +19,18 @@ interface LoginCredentials {
   password: string;
 }
 
+export interface CustomerSignupInput {
+  firstName: string;
+  lastName?: string;
+  email: string;
+  phone?: string;
+  password: string;
+}
+
+export interface CustomerSignupResponse {
+  user: AuthUser;
+}
+
 interface ErrorResponse {
   message?: string | string[];
 }
@@ -65,4 +77,40 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
   }
 
   return body as LoginResponse;
+}
+
+export function storeAuthSession(auth: LoginResponse) {
+  localStorage.setItem('trimly.accessToken', auth.accessToken);
+  localStorage.setItem('trimly.user', JSON.stringify(auth.user));
+}
+
+export async function signupCustomer(
+  customer: CustomerSignupInput,
+): Promise<CustomerSignupResponse> {
+  const response = await fetch(`${API_URL}/auth/signup/customer`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(customer),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | CustomerSignupResponse
+    | ErrorResponse
+    | null;
+
+  if (!response.ok) {
+    const message = body && 'message' in body ? body.message : undefined;
+    const readableMessage = Array.isArray(message) ? message.join(', ') : message;
+    throw new AuthApiError(readableMessage ?? 'Unable to create your account', response.status);
+  }
+
+  if (!body || !('user' in body)) {
+    throw new AuthApiError('The server returned an invalid signup response', response.status);
+  }
+
+  return body;
 }
