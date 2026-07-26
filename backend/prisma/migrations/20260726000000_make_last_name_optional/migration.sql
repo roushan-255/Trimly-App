@@ -1,0 +1,3 @@
+ALTER TABLE "CustomerProfile" ALTER COLUMN "lastName" DROP NOT NULL;
+ALTER TABLE "ShopOwnerProfile" ALTER COLUMN "lastName" DROP NOT NULL;
+ALTER TABLE "AdminProfile" ALTER COLUMN "lastName" DROP NOT NULL;

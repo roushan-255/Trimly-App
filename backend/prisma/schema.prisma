@@ -59,7 +59,7 @@ model CustomerProfile {
   userId String @unique @db.Uuid
 
   firstName String
-  lastName  String
+  lastName  String?
 
   avatar String?
 
@@ -81,7 +81,7 @@ model ShopOwnerProfile {
   id                String    @id @default(uuid()) @db.Uuid
   userId            String    @unique @db.Uuid
   firstName         String
-  lastName          String
+  lastName          String?
   avatarUrl         String?
   businessLegalName String?
   gstin             String?   @unique
@@ -99,7 +99,7 @@ model AdminProfile {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @unique @db.Uuid
   firstName   String
-  lastName    String
+  lastName    String?
   avatarUrl   String?
   designation String?
   department  String?
