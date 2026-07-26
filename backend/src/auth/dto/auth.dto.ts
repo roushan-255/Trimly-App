@@ -1,7 +1,6 @@
 import { Transform } from "class-transformer";
 import {
   IsEmail,
-  isNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -29,9 +28,7 @@ const uppercaseOptional = ({ value }: { value: unknown }) => {
 };
 
 export class LoginDto {
-  @Transform(({ value }) =>
-    typeof value === "string" ? value.trim().toLowerCase() : value,
-  )
+  @Transform(trim)
   @IsEmail()
   @MaxLength(320)
   email!: string;
