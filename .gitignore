@@ -6,10 +6,9 @@ dist/
 coverage/
 
 # Environment files
-.env
-.env.local
-.env.*.local
+.env*
 !.env.example
+!**/.env.example
 
 # Logs and local tooling
 *.log
