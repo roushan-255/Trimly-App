@@ -8,13 +8,17 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { AuthenticatedUser } from "../auth/auth-user";
-import { BearerTokenGuard } from "../auth/bearer-token.guard";
-import { CurrentUser } from "../auth/current-user.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { BearerTokenGuard } from "../auth/guards/bearer-token.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { UserRole } from "../generated/prisma/enums";
 import { CreateBarberDto, CreateShopDto } from "./dto/owner.dto";
 import { OwnerService } from "./owner.service";
 
 @Controller("owner")
-@UseGuards(BearerTokenGuard)
+@Roles(UserRole.SHOP_OWNER)
+@UseGuards(BearerTokenGuard, RolesGuard)
 export class OwnerController {
   constructor(private readonly owners: OwnerService) {}
 
@@ -40,4 +44,3 @@ export class OwnerController {
     return this.owners.addBarber(user, shopId, dto);
   }
 }
-

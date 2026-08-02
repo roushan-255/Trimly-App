@@ -5,8 +5,8 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { Request } from "express";
-import { AccessTokenService } from "./access-token.service";
-import type { AuthenticatedUser } from "./auth-user";
+import { AccessTokenService } from "../access-token.service";
+import type { AuthenticatedUser } from "../auth-user";
 
 export type AuthenticatedRequest = Request & {
   authUser?: AuthenticatedUser;
@@ -32,4 +32,3 @@ export class BearerTokenGuard implements CanActivate {
     return true;
   }
 }
-

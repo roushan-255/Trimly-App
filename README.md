@@ -95,8 +95,9 @@ Owner signup creates the owner profile and first shop together. Barber accounts
 can only be added through the protected owner route, which verifies that the
 shop belongs to the authenticated owner. Admin signup is intentionally public
 for the initial MVP and must be protected or removed before production. The
-current implementation uses service-level owner checks and does not use a
-`RolesGuard`.
+owner controller uses `BearerTokenGuard` for authentication and `RolesGuard`
+with `@Roles(UserRole.SHOP_OWNER)` for role authorization. The service also
+checks shop ownership before operating on a specific shop.
 
 ## Commands
 
