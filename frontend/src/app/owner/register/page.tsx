@@ -124,7 +124,7 @@ export default function OwnerRegisterPage() {
         form.password.length < 8 ||
         form.password !== form.confirmPassword)
     ) {
-      setError('Enter your name, a valid email, and matching passwords of at least 8 characters.');
+      setError('Enter your name, a valid email, and passwords of at least 8 characters.');
       return false;
     }
 
@@ -191,7 +191,11 @@ export default function OwnerRegisterPage() {
           country: form.country.trim(),
         },
       });
-      const auth = await login({ email, password: form.password });
+      const auth = await login({
+        email,
+        password: form.password,
+        role: 'SHOP_OWNER',
+      });
       storeAuthSession(auth);
       localStorage.removeItem('trimly.mock.customer');
       router.push('/owner/dashboard');
@@ -284,8 +288,8 @@ export default function OwnerRegisterPage() {
                   <Field label="Last name" hint="(optional)" autoComplete="family-name" value={form.lastName} onChange={(event) => update('lastName', event.target.value)} />
                   <Field label="Work email" type="email" required autoComplete="email" placeholder="owner@yourshop.com" value={form.email} onChange={(event) => update('email', event.target.value)} />
                   <Field label="Phone" hint="(optional)" type="tel" autoComplete="tel" placeholder="+91 98765 43210" value={form.phone} onChange={(event) => update('phone', event.target.value)} />
-                  <Field label="Password" type="password" required autoComplete="new-password" placeholder="At least 8 characters" value={form.password} onChange={(event) => update('password', event.target.value)} />
-                  <Field label="Confirm password" type="password" required autoComplete="new-password" value={form.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} />
+                  <Field label="New owner password" type="password" required autoComplete="new-password" placeholder="At least 8 characters" value={form.password} onChange={(event) => update('password', event.target.value)} />
+                  <Field label="Confirm owner password" type="password" required autoComplete="new-password" value={form.confirmPassword} onChange={(event) => update('confirmPassword', event.target.value)} />
                 </div>
               </div>
             )}
@@ -345,7 +349,7 @@ export default function OwnerRegisterPage() {
                 </button>
               ) : (
                 <p className="text-sm text-slate-500">
-                  Already registered? <Link href="/login?returnTo=/owner/dashboard" className="font-bold text-emerald-700">Log in</Link>
+                  Already registered? <Link href="/owner/login" className="font-bold text-emerald-700">Log in</Link>
                 </p>
               )}
               <button type="submit" disabled={isSubmitting} className="inline-flex min-w-36 items-center justify-center gap-2 rounded-xl bg-[#0d2231] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#173b4c] disabled:cursor-wait disabled:opacity-60">

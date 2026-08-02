@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
   IsEmail,
   IsDefined,
+  IsEnum,
   IsOptional,
   IsString,
   Matches,
@@ -9,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { UserRole } from "../../generated/prisma/enums";
 import { CreateShopDto } from "../../owner/dto/owner.dto";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -32,7 +34,7 @@ const uppercaseOptional = ({ value }: { value: unknown }) => {
   return typeof trimmed === "string" ? trimmed.toUpperCase() : trimmed;
 };
 
-export class LoginDto {
+class CredentialsDto {
   @Transform(normalizeEmail)
   @IsEmail()
   @MaxLength(320)
@@ -44,11 +46,17 @@ export class LoginDto {
   password!: string;
 }
 
-export class SignupCredentialsDto extends LoginDto {
+export class LoginDto extends CredentialsDto {
+  @IsEnum(UserRole)
+  role!: UserRole;
+}
+
+export class SignupCredentialsDto extends CredentialsDto {
   @Transform(normalizePhone)
   @IsOptional()
   @Matches(/^\+?[1-9]\d{7,14}$/)
   phone?: string;
+
 }
 
 class BaseSignupDto extends SignupCredentialsDto {

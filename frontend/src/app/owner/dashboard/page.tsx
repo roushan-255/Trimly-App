@@ -64,7 +64,7 @@ export default function OwnerDashboardPage() {
     const session = readAuthSession();
     if (!session || session.user.role !== 'SHOP_OWNER') {
       clearAuthSession();
-      router.replace('/login?returnTo=/owner/dashboard');
+      router.replace('/owner/login');
       return;
     }
 
@@ -76,7 +76,7 @@ export default function OwnerDashboardPage() {
       })
       .catch((caught: unknown) => {
         if (caught instanceof AuthApiError && caught.status === 401) {
-          router.replace('/login?returnTo=/owner/dashboard');
+          router.replace('/owner/login');
           return;
         }
         setLoadError(
@@ -96,7 +96,7 @@ export default function OwnerDashboardPage() {
 
   const logout = () => {
     clearAuthSession();
-    router.push('/login');
+    router.push('/owner/login');
   };
 
   const addBarberToShop = (barber: OwnerBarber) => {

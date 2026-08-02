@@ -12,7 +12,6 @@ import {
   CustomerSignupDto,
   LoginDto,
   ShopOwnerSignupDto,
-  SignupCredentialsDto,
 } from "./dto/auth.dto";
 import { PasswordService } from "./password.service";
 
@@ -20,14 +19,22 @@ const publicUserSelect = {
   id: true,
   email: true,
   phone: true,
-  role: true,
+  roles: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-type ProfileCreateData = Pick<
-  Prisma.UserCreateInput,
-  "customerProfile" | "ownerProfile" | "barberProfile" | "adminProfile"
->;
+const existingUserSelect = {
+  id: true,
+  phone: true,
+  roles: true,
+  customerProfile: { select: { id: true } },
+  ownerProfile: { select: { id: true } },
+  adminProfile: { select: { id: true } },
+} satisfies Prisma.UserSelect;
+
+type ExistingUser = Prisma.UserGetPayload<{
+  select: typeof existingUserSelect;
+}>;
 
 @Injectable()
 export class AuthService {
@@ -37,21 +44,58 @@ export class AuthService {
     private readonly accessTokens: AccessTokenService,
   ) {}
 
-  signupCustomer(dto: CustomerSignupDto) {
-    return this.createUser(dto, UserRole.CUSTOMER, {
-      customerProfile: {
+  async signupCustomer(dto: CustomerSignupDto) {
+    return this.handleSignup(async () => {
+      const existing = await this.findExistingAccount(dto.email);
+      const customerProfile = {
         create: {
           firstName: dto.firstName,
           lastName: dto.lastName,
           avatar: dto.avatar,
         },
-      },
+      };
+
+      if (existing) {
+        if (existing.customerProfile) {
+          throw new ConflictException("This account is already a customer");
+        }
+
+        const passwordHash = await this.passwords.hash(dto.password);
+
+        return this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            phone: existing.phone ?? dto.phone,
+            roles: this.mergeRoles(existing.roles, UserRole.CUSTOMER),
+            roleCredentials: {
+              create: { role: UserRole.CUSTOMER, passwordHash },
+            },
+            customerProfile,
+          },
+          select: publicUserSelect,
+        });
+      }
+
+      const passwordHash = await this.passwords.hash(dto.password);
+      return this.prisma.user.create({
+        data: {
+          email: dto.email,
+          phone: dto.phone,
+          roles: [UserRole.CUSTOMER],
+          roleCredentials: {
+            create: { role: UserRole.CUSTOMER, passwordHash },
+          },
+          customerProfile,
+        },
+        select: publicUserSelect,
+      });
     });
   }
 
-  signupShopOwner(dto: ShopOwnerSignupDto) {
-    return this.createUser(dto, UserRole.SHOP_OWNER, {
-      ownerProfile: {
+  async signupShopOwner(dto: ShopOwnerSignupDto) {
+    return this.handleSignup(async () => {
+      const existing = await this.findExistingAccount(dto.email);
+      const ownerProfile = {
         create: {
           firstName: dto.firstName,
           lastName: dto.lastName,
@@ -59,28 +103,50 @@ export class AuthService {
           businessLegalName: dto.businessLegalName,
           gstin: dto.gstin,
           panNumber: dto.panNumber,
-          shops: {
-            create: {
-              name: dto.shop.name,
-              description: dto.shop.description,
-              phone: dto.shop.phone,
-              email: dto.shop.email,
-              addressLine1: dto.shop.addressLine1,
-              addressLine2: dto.shop.addressLine2,
-              city: dto.shop.city,
-              state: dto.shop.state,
-              postalCode: dto.shop.postalCode,
-              country: dto.shop.country,
-            },
-          },
+          shops: { create: dto.shop },
         },
-      },
+      };
+      if (existing) {
+        if (existing.ownerProfile) {
+          throw new ConflictException("This account is already a shop owner");
+        }
+
+        const passwordHash = await this.passwords.hash(dto.password);
+
+        return this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            phone: existing.phone ?? dto.phone,
+            roles: this.mergeRoles(existing.roles, UserRole.SHOP_OWNER),
+            roleCredentials: {
+              create: { role: UserRole.SHOP_OWNER, passwordHash },
+            },
+            ownerProfile,
+          },
+          select: publicUserSelect,
+        });
+      }
+
+      const passwordHash = await this.passwords.hash(dto.password);
+      return this.prisma.user.create({
+        data: {
+          email: dto.email,
+          phone: dto.phone,
+          roles: [UserRole.SHOP_OWNER],
+          roleCredentials: {
+            create: { role: UserRole.SHOP_OWNER, passwordHash },
+          },
+          ownerProfile,
+        },
+        select: publicUserSelect,
+      });
     });
   }
 
-  signupAdmin(dto: AdminSignupDto) {
-    return this.createUser(dto, UserRole.ADMIN, {
-      adminProfile: {
+  async signupAdmin(dto: AdminSignupDto) {
+    return this.handleSignup(async () => {
+      const existing = await this.findExistingAccount(dto.email);
+      const adminProfile = {
         create: {
           firstName: dto.firstName,
           lastName: dto.lastName,
@@ -88,63 +154,131 @@ export class AuthService {
           designation: dto.designation,
           department: dto.department,
         },
-      },
+      };
+
+      if (existing) {
+        if (existing.adminProfile) {
+          throw new ConflictException("This account is already an admin");
+        }
+
+        const passwordHash = await this.passwords.hash(dto.password);
+
+        return this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            phone: existing.phone ?? dto.phone,
+            roles: this.mergeRoles(existing.roles, UserRole.ADMIN),
+            roleCredentials: {
+              create: { role: UserRole.ADMIN, passwordHash },
+            },
+            adminProfile,
+          },
+          select: publicUserSelect,
+        });
+      }
+
+      const passwordHash = await this.passwords.hash(dto.password);
+      return this.prisma.user.create({
+        data: {
+          email: dto.email,
+          phone: dto.phone,
+          roles: [UserRole.ADMIN],
+          roleCredentials: {
+            create: { role: UserRole.ADMIN, passwordHash },
+          },
+          adminProfile,
+        },
+        select: publicUserSelect,
+      });
     });
   }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      include: {
+        roleCredentials: {
+          select: { role: true, passwordHash: true },
+        },
+      },
     });
+    const credential = user?.roleCredentials.find(
+      ({ role }) => role === dto.role,
+    );
 
     if (
       !user ||
-      !(await this.passwords.verify(dto.password, user.passwordHash))
+      (credential &&
+        !(await this.passwords.verify(dto.password, credential.passwordHash)))
     ) {
       throw new UnauthorizedException("Invalid email or password");
     }
 
+    if (!credential) {
+      const ownsAccount = await this.matchesAnyCredential(
+        user.roleCredentials,
+        dto.password,
+      );
+
+      if (!ownsAccount) {
+        throw new UnauthorizedException("Invalid email or password");
+      }
+
+      throw new UnauthorizedException(
+        dto.role === UserRole.CUSTOMER
+          ? "This account is not registered as a customer"
+          : dto.role === UserRole.SHOP_OWNER
+            ? "This account is not registered as a shop owner"
+            : "This account does not have access to the selected portal",
+      );
+    }
+
     return {
-      ...this.accessTokens.issue(user),
+      ...this.accessTokens.issue({ id: user.id, role: dto.role }),
       user: {
         id: user.id,
         email: user.email,
         phone: user.phone,
-        role: user.role,
+        role: dto.role,
+        roles: user.roles,
       },
     };
   }
 
-  private async createUser(
-    credentials: SignupCredentialsDto,
-    role: UserRole,
-    profile: ProfileCreateData,
-  ) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: credentials.email },
-      select: { id: true },
+  private findExistingAccount(email: string): Promise<ExistingUser | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: existingUserSelect,
     });
+  }
 
-    if (existingUser) {
-      throw new ConflictException("An account with this email already exists");
-    }
+  private async matchesAnyCredential(
+    credentials: { passwordHash: string }[],
+    password: string,
+  ) {
+    const matches = await Promise.all(
+      credentials.map(({ passwordHash }) =>
+        this.passwords.verify(password, passwordHash),
+      ),
+    );
+    return matches.some(Boolean);
+  }
 
-    const passwordHash = await this.passwords.hash(credentials.password);
+  private mergeRoles(current: UserRole[], ...additional: UserRole[]) {
+    return [...new Set([...current, ...additional])];
+  }
 
+  private async handleSignup<T>(operation: () => Promise<T>) {
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          email: credentials.email,
-          phone: credentials.phone,
-          passwordHash,
-          role,
-          ...profile,
-        },
-        select: publicUserSelect,
-      });
-
-      return { user };
+      return { user: await operation() };
     } catch (error: unknown) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException
+      ) {
+        throw error;
+      }
+
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
