@@ -1,9 +1,13 @@
 export type UserRole = 'CUSTOMER' | 'SHOP_OWNER' | 'BARBER' | 'ADMIN';
 
-export interface AuthUser {
+export interface AccountUser {
   id: string;
   email: string;
   phone: string | null;
+  roles: UserRole[];
+}
+
+export interface AuthUser extends AccountUser {
   role: UserRole;
 }
 
@@ -17,6 +21,7 @@ export interface LoginResponse {
 interface LoginCredentials {
   email: string;
   password: string;
+  role: UserRole;
 }
 
 export interface CustomerSignupInput {
@@ -53,7 +58,7 @@ export interface ShopOwnerSignupInput {
 }
 
 export interface SignupResponse {
-  user: AuthUser;
+  user: AccountUser;
 }
 
 interface ErrorResponse {
@@ -119,6 +124,10 @@ export function readAuthSession(): { accessToken: string; user: AuthUser } | nul
     if (
       typeof user.id !== 'string' ||
       typeof user.email !== 'string' ||
+      !Array.isArray(user.roles) ||
+      !user.roles.every((role) =>
+        ['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(role),
+      ) ||
       !['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(user.role ?? '')
     ) {
       return null;

@@ -93,8 +93,10 @@ export class OwnerService {
         data: {
           email: dto.email,
           phone: dto.phone,
-          passwordHash,
-          role: UserRole.BARBER,
+          roles: [UserRole.BARBER],
+          roleCredentials: {
+            create: { role: UserRole.BARBER, passwordHash },
+          },
           barberProfile: {
             create: {
               displayName: dto.displayName,

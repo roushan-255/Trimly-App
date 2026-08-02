@@ -16,12 +16,16 @@ cp frontend/.env.example frontend/.env.local
 corepack pnpm --dir frontend dev
 ```
 
-Open http://localhost:3000 for the customer-facing home page. Login and signup
-are available at http://localhost:3000/login and http://localhost:3000/signup.
+Open http://localhost:3000 for the customer-facing home page. Customer login
+and signup are available at http://localhost:3000/customer/login and
+http://localhost:3000/signup.
 
 Shop owners can register their account and first shop at
 http://localhost:3000/owner/register. After login, the owner dashboard is
-available at http://localhost:3000/owner/dashboard.
+available at http://localhost:3000/owner/dashboard. Owners log in through
+http://localhost:3000/owner/login. The same email can also be used at
+http://localhost:3000/customer/login after customer registration is completed
+for that account; customer and owner passwords may be different.
 
 If you prefer to use `pnpm` directly, run `corepack enable` once and then use the
 same commands without the `corepack` prefix.
@@ -46,7 +50,37 @@ The MVP authentication routes are:
 - `POST /auth/signup/admin`
 - `POST /auth/login`
 
-Owner routes require a `SHOP_OWNER` bearer access token:
+Customer and owner login pages both call `POST /auth/login`. The request body
+selects the portal role whose password should be verified:
+
+```json
+{
+  "email": "person@example.com",
+  "password": "role-specific-password",
+  "role": "CUSTOMER"
+}
+```
+
+Use `"SHOP_OWNER"` when logging in through the owner portal.
+
+## Accounts, roles, and passwords
+
+An email identifies one `User`, and `User.roles` contains every role registered
+for that account. Customer and owner activation are separate:
+
+- Customer signup adds `CUSTOMER` and creates a `CustomerProfile`.
+- Owner signup adds `SHOP_OWNER` and creates a `ShopOwnerProfile` plus the first
+  shop.
+- Registering another role with the same email extends the existing user instead
+  of creating a duplicate user.
+
+Passwords are stored per role in `RoleCredential`, so the same email may use one
+password at `/customer/login` and another at `/owner/login`. Only password hashes
+are stored. Existing-account ownership verification is not implemented in this
+MVP; adding another role currently relies on the matching email alone. Add
+authenticated role activation or email verification before production.
+
+Owner routes require a bearer token issued from a `SHOP_OWNER` login:
 
 - `GET /owner/shops`
 - `POST /owner/shops`
@@ -60,7 +94,9 @@ Customer-facing shop discovery uses the public database-backed routes:
 Owner signup creates the owner profile and first shop together. Barber accounts
 can only be added through the protected owner route, which verifies that the
 shop belongs to the authenticated owner. Admin signup is intentionally public
-for the initial MVP and must be protected or removed before production.
+for the initial MVP and must be protected or removed before production. The
+current implementation uses service-level owner checks and does not use a
+`RolesGuard`.
 
 ## Commands
 
@@ -68,6 +104,9 @@ for the initial MVP and must be protected or removed before production.
 - `corepack pnpm --dir backend start:dev` — run only the API
 - `corepack pnpm --dir frontend build` — build the frontend
 - `corepack pnpm build` — build both applications once the backend is complete
+- `corepack pnpm --dir backend prisma:generate` — regenerate the Prisma client
+- `corepack pnpm --dir backend exec prisma migrate deploy` — apply checked-in
+  database migrations
 
 ## Database
 

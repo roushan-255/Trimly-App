@@ -47,8 +47,7 @@ model User {
   id                    String    @id @default(uuid()) @db.Uuid
   email                 String    @unique
   phone                 String?
-  passwordHash          String
-  role                  UserRole
+  roles                 UserRole[] @default([])
   refreshTokenHash      String?
   refreshTokenExpiresAt DateTime?
 
@@ -59,6 +58,21 @@ model User {
   ownerProfile    ShopOwnerProfile?
   adminProfile    AdminProfile?
   barberProfile   Barber?
+  roleCredentials RoleCredential[]
+}
+
+model RoleCredential {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  role         UserRole
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
 }
 
 model CustomerProfile {
