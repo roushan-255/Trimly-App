@@ -1,17 +1,134 @@
 'use client';
 
-import { CalendarDays, CheckCircle2, Clock3, MapPin, Star, Users } from 'lucide-react';
+import {
+  BadgeCheck,
+  Clock3,
+  LoaderCircle,
+  Mail,
+  MapPin,
+  Phone,
+  Scissors,
+  Star,
+  Store,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
-
-const services = [{ name: 'Classic Haircut', price: '299', duration: '45 min' }, { name: 'Haircut & Beard', price: '499', duration: '60 min' }, { name: 'Beard Trim', price: '199', duration: '25 min' }];
-const barbers = ['Arjun Mehta', 'Rohit Kapoor', 'Sameer Khan']; const slots = ['10:30 AM', '11:30 AM', '1:00 PM', '3:30 PM', '5:00 PM'];
+import { AuthApiError } from '@/lib/auth';
+import { PublicShop, getPublicShop } from '@/lib/shops';
 
 export default function ShopPage() {
-  const params = useParams<{ shopId: string }>(); const [service, setService] = useState(services[0]); const [barber, setBarber] = useState(barbers[0]); const [date, setDate] = useState('2026-08-02'); const [time, setTime] = useState(slots[1]);
-  const shop = params.shopId === 'blade-and-brush' ? 'Blade & Brush' : params.shopId === 'northside-barber-co' ? 'Northside Barber Co.' : "The Gentleman's Chair";
-  const checkout = new URLSearchParams({ shop, service: service.name, barber, date: new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }), time, price: service.price });
-  return <main className="min-h-screen bg-stone-50"><Navbar /><section className="border-b border-slate-200 bg-white"><div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10"><Link href="/shops" className="text-sm font-bold text-emerald-700">← All barber shops</Link><div className="mt-7 grid gap-8 lg:grid-cols-[1.25fr_.75fr]"><img className="h-72 w-full rounded-2xl object-cover" src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1200&q=85" alt={`${shop} interior`} /><div><p className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star className="size-4 fill-current" /> 4.9 · 286 reviews</p><h1 className="mt-2 text-4xl font-extrabold tracking-tight text-slate-950">{shop}</h1><p className="mt-3 flex items-center gap-2 text-slate-600"><MapPin className="size-4 text-emerald-600" /> 1.2 km away · Open until 8:00 PM</p><div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-slate-600"><span className="flex items-center gap-1"><Users className="size-4 text-emerald-600" /> 6 barbers</span><span className="flex items-center gap-1"><Clock3 className="size-4 text-emerald-600" /> 8 min avg. wait</span><span className="flex items-center gap-1"><CheckCircle2 className="size-4 text-emerald-600" /> Verified shop</span></div></div></div></div></section><section className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_.85fr] lg:px-10"><div className="space-y-10"><div><h2 className="text-2xl font-extrabold text-slate-950">Choose a service</h2><div className="mt-4 grid gap-3">{services.map((item) => <button key={item.name} onClick={() => setService(item)} className={`flex items-center justify-between rounded-xl border p-4 text-left ${service.name === item.name ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white'}`}><span><b className="block">{item.name}</b><small className="text-slate-500">{item.duration}</small></span><b>₹{item.price}</b></button>)}</div></div><div><h2 className="text-2xl font-extrabold text-slate-950">Choose your barber</h2><div className="mt-4 flex flex-wrap gap-3">{barbers.map((item) => <button key={item} onClick={() => setBarber(item)} className={`rounded-xl border px-4 py-3 text-sm font-bold ${barber === item ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div><div><h2 className="text-2xl font-extrabold text-slate-950">Select a date & time</h2><label className="mt-4 block max-w-xs text-sm font-bold text-slate-700">Date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3" /></label><div className="mt-4 flex flex-wrap gap-2">{slots.map((item) => <button key={item} onClick={() => setTime(item)} className={`rounded-lg border px-3 py-2 text-sm font-bold ${time === item ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{item}</button>)}</div></div></div><aside className="h-fit rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-6"><h2 className="text-lg font-extrabold text-slate-950">Booking summary</h2><div className="mt-5 space-y-3 text-sm text-slate-600"><p><b className="text-slate-900">{service.name}</b> · {service.duration}</p><p>{barber}</p><p className="flex items-center gap-2"><CalendarDays className="size-4 text-emerald-600" /> {date} at {time}</p><p className="border-t border-slate-100 pt-4 text-lg font-extrabold text-slate-950">₹{service.price}</p></div><Link href={`/checkout?${checkout.toString()}`} className="mt-6 block rounded-xl bg-emerald-600 px-4 py-3 text-center text-sm font-bold text-white hover:bg-emerald-700">Continue to Checkout</Link><p className="mt-3 text-center text-xs text-slate-500">No login needed until checkout.</p></aside></section></main>;
+  const params = useParams<{ shopId: string }>();
+  const [shop, setShop] = useState<PublicShop | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setIsLoading(true);
+    getPublicShop(params.shopId)
+      .then(setShop)
+      .catch((caught: unknown) =>
+        setError(
+          caught instanceof AuthApiError
+            ? caught.message
+            : 'Unable to load this shop.',
+        ),
+      )
+      .finally(() => setIsLoading(false));
+  }, [params.shopId]);
+
+  if (isLoading) {
+    return <main className="min-h-screen bg-stone-50"><Navbar /><div className="grid min-h-[65vh] place-items-center"><div className="text-center text-sm font-semibold text-slate-500"><LoaderCircle className="mx-auto mb-3 size-7 animate-spin text-emerald-600" />Loading shop…</div></div></main>;
+  }
+
+  if (!shop || error) {
+    return <main className="min-h-screen bg-stone-50"><Navbar /><div className="mx-auto max-w-3xl px-5 py-24 text-center"><Store className="mx-auto size-10 text-slate-400" /><h1 className="mt-4 text-3xl font-extrabold">Shop not found</h1><p className="mt-2 text-slate-500">{error || 'This shop is not available.'}</p><Link href="/shops" className="mt-6 inline-flex rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">Browse all shops</Link></div></main>;
+  }
+
+  const address = [
+    shop.addressLine1,
+    shop.addressLine2,
+    shop.city,
+    shop.state,
+    shop.postalCode,
+    shop.country,
+  ].filter(Boolean).join(', ');
+
+  return (
+    <main className="min-h-screen bg-stone-50">
+      <Navbar />
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
+          <Link href="/shops" className="text-sm font-bold text-emerald-700">← All barber shops</Link>
+          <div className="mt-7 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
+            <div className="relative grid h-72 place-items-center overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_20%_15%,rgba(184,231,209,.65),transparent_34%),linear-gradient(135deg,#0d2231,#1f5b58)] text-white">
+              <div className="absolute -bottom-24 -right-12 size-72 rounded-full border border-white/10 shadow-[0_0_0_60px_rgba(255,255,255,.025),0_0_0_120px_rgba(255,255,255,.018)]" />
+              <div className="relative text-center">
+                <span className="mx-auto grid size-20 place-items-center rounded-3xl border border-white/15 bg-white/10 text-emerald-200 backdrop-blur"><Scissors className="size-10" /></span>
+                <p className="mt-4 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-100">{shop.city}</p>
+              </div>
+            </div>
+            <div className="self-center">
+              <div className="flex flex-wrap items-center gap-3">
+                {shop.rating === null ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">New on Trimly</span> : <p className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star className="size-4 fill-current" /> {shop.rating} · {shop.reviewCount} reviews</p>}
+                {shop.verified && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700"><BadgeCheck className="size-4" /> Verified</span>}
+              </div>
+              <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl">{shop.name}</h1>
+              <p className="mt-4 flex items-start gap-2 leading-6 text-slate-600"><MapPin className="mt-1 size-4 shrink-0 text-emerald-600" /> {address}</p>
+              <div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-slate-600">
+                <span className="flex items-center gap-1"><Users className="size-4 text-emerald-600" /> {shop.barberCount} {shop.barberCount === 1 ? 'barber' : 'barbers'}</span>
+                <span className="flex items-center gap-1"><Scissors className="size-4 text-emerald-600" /> {shop.serviceCount} {shop.serviceCount === 1 ? 'service' : 'services'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_.72fr] lg:px-10">
+        <div className="space-y-10">
+          <article>
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700">About the shop</p>
+            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">A closer look at {shop.name}</h2>
+            <p className="mt-4 max-w-3xl leading-7 text-slate-600">{shop.description || 'This shop has recently joined Trimly. More information will be added by the owner soon.'}</p>
+          </article>
+
+          <article>
+            <h2 className="text-2xl font-extrabold text-slate-950">Services</h2>
+            {shop.services.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-sm text-slate-500">The owner has not published services yet.</div>
+            ) : (
+              <div className="mt-4 grid gap-3">
+                {shop.services.map((service) => <div key={service.id} className="flex items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div><h3 className="font-extrabold">{service.name}</h3><p className="mt-1 text-sm text-slate-500">{service.description || `${service.durationMin} minute appointment`}</p><p className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-400"><Clock3 className="size-3.5" /> {service.durationMin} min</p></div><strong className="text-lg text-emerald-700">₹{service.price}</strong></div>)}
+              </div>
+            )}
+          </article>
+
+          <article>
+            <h2 className="text-2xl font-extrabold text-slate-950">Meet the team</h2>
+            {shop.barbers.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-sm text-slate-500">The owner has not added barbers yet.</div>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {shop.barbers.map((barber) => <div key={barber.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><span className="grid size-12 place-items-center rounded-full bg-[#0d2231] font-extrabold text-emerald-200">{barber.displayName.slice(0, 1).toUpperCase()}</span><h3 className="mt-4 font-extrabold">{barber.displayName}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{barber.bio || 'Barber at this Trimly location.'}</p></div>)}
+              </div>
+            )}
+          </article>
+        </div>
+
+        <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
+          <h2 className="text-lg font-extrabold text-slate-950">Contact & location</h2>
+          <div className="mt-5 space-y-4 text-sm leading-6 text-slate-600">
+            <p className="flex items-start gap-3"><MapPin className="mt-1 size-4 shrink-0 text-emerald-600" /> {address}</p>
+            {shop.phone && <a href={`tel:${shop.phone}`} className="flex items-center gap-3 hover:text-emerald-700"><Phone className="size-4 text-emerald-600" /> {shop.phone}</a>}
+            {shop.email && <a href={`mailto:${shop.email}`} className="flex items-center gap-3 hover:text-emerald-700"><Mail className="size-4 text-emerald-600" /> {shop.email}</a>}
+          </div>
+          <div className="mt-6 rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+            Online booking will become available when the owner publishes services and appointment slots.
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
 }

@@ -9,6 +9,7 @@ import { Brand } from './brand';
 const navigation = [
   { href: '#how-it-works', label: 'How It Works' },
   { href: '#reviews', label: 'Reviews' },
+  { href: '/owner/register', label: 'For Shop Owners' },
 ];
 
 export function Navbar() {

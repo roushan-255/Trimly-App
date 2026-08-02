@@ -16,8 +16,12 @@ cp frontend/.env.example frontend/.env.local
 corepack pnpm --dir frontend dev
 ```
 
-Open http://localhost:3000. The home route redirects to the login page at
-http://localhost:3000/login.
+Open http://localhost:3000 for the customer-facing home page. Login and signup
+are available at http://localhost:3000/login and http://localhost:3000/signup.
+
+Shop owners can register their account and first shop at
+http://localhost:3000/owner/register. After login, the owner dashboard is
+available at http://localhost:3000/owner/dashboard.
 
 If you prefer to use `pnpm` directly, run `corepack enable` once and then use the
 same commands without the `corepack` prefix.
@@ -39,12 +43,24 @@ The MVP authentication routes are:
 
 - `POST /auth/signup/customer`
 - `POST /auth/signup/shop-owner`
-- `POST /auth/signup/barber`
 - `POST /auth/signup/admin`
 - `POST /auth/login`
 
-Barber signup requires the UUID of an existing shop. Admin signup is intentionally
-public for the initial MVP and must be protected or removed before production.
+Owner routes require a `SHOP_OWNER` bearer access token:
+
+- `GET /owner/shops`
+- `POST /owner/shops`
+- `POST /owner/shops/:shopId/barbers`
+
+Customer-facing shop discovery uses the public database-backed routes:
+
+- `GET /shops`
+- `GET /shops/:shopId`
+
+Owner signup creates the owner profile and first shop together. Barber accounts
+can only be added through the protected owner route, which verifies that the
+shop belongs to the authenticated owner. Admin signup is intentionally public
+for the initial MVP and must be protected or removed before production.
 
 ## Commands
 
@@ -57,5 +73,4 @@ public for the initial MVP and must be protected or removed before production.
 
 Set `DATABASE_URL` in `backend/.env` to the PostgreSQL connection URL you provide.
 Prisma is configured in `backend/prisma/schema.prisma` with the initial booking
-domain models. Authentication fields, session storage, and migrations still need
-to be added as part of the backend implementation.
+domain models. Apply the checked-in migrations before starting the backend.

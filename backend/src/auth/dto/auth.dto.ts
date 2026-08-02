@@ -1,16 +1,21 @@
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsEmail,
+  IsDefined,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from "class-validator";
+import { CreateShopDto } from "../../owner/dto/owner.dto";
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
+
+const normalizeEmail = ({ value }: { value: unknown }) =>
+  typeof value === "string" ? value.trim().toLowerCase() : value;
 
 const optionalTrim = ({ value }: { value: unknown }) => {
   if (value === undefined || value === null || value === "") return undefined;
@@ -28,7 +33,7 @@ const uppercaseOptional = ({ value }: { value: unknown }) => {
 };
 
 export class LoginDto {
-  @Transform(trim)
+  @Transform(normalizeEmail)
   @IsEmail()
   @MaxLength(320)
   email!: string;
@@ -92,24 +97,11 @@ export class ShopOwnerSignupDto extends BaseSignupDto {
   @IsString()
   @MaxLength(20)
   panNumber?: string;
-}
 
-export class BarberSignupDto extends SignupCredentialsDto {
-  @Transform(trim)
-  @IsUUID()
-  shopId!: string;
-
-  @Transform(trim)
-  @IsString()
-  @MinLength(1)
-  @MaxLength(150)
-  displayName!: string;
-
-  @Transform(optionalTrim)
-  @IsOptional()
-  @IsString()
-  @MaxLength(2_000)
-  bio?: string;
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => CreateShopDto)
+  shop!: CreateShopDto;
 }
 
 export class AdminSignupDto extends BaseSignupDto {

@@ -27,7 +27,32 @@ export interface CustomerSignupInput {
   password: string;
 }
 
-export interface CustomerSignupResponse {
+export interface ShopRegistrationInput {
+  name: string;
+  description?: string;
+  phone?: string;
+  email?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface ShopOwnerSignupInput {
+  firstName: string;
+  lastName?: string;
+  email: string;
+  phone?: string;
+  password: string;
+  businessLegalName?: string;
+  gstin?: string;
+  panNumber?: string;
+  shop: ShopRegistrationInput;
+}
+
+export interface SignupResponse {
   user: AuthUser;
 }
 
@@ -35,7 +60,7 @@ interface ErrorResponse {
   message?: string | string[];
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
 
 export class AuthApiError extends Error {
   constructor(
@@ -84,9 +109,37 @@ export function storeAuthSession(auth: LoginResponse) {
   localStorage.setItem('trimly.user', JSON.stringify(auth.user));
 }
 
+export function readAuthSession(): { accessToken: string; user: AuthUser } | null {
+  const accessToken = localStorage.getItem('trimly.accessToken');
+  const storedUser = localStorage.getItem('trimly.user');
+  if (!accessToken || !storedUser) return null;
+
+  try {
+    const user = JSON.parse(storedUser) as Partial<AuthUser>;
+    if (
+      typeof user.id !== 'string' ||
+      typeof user.email !== 'string' ||
+      !['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(user.role ?? '')
+    ) {
+      return null;
+    }
+    return { accessToken, user: user as AuthUser };
+  } catch {
+    return null;
+  }
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem('trimly.accessToken');
+  localStorage.removeItem('trimly.user');
+  localStorage.removeItem('trimly.mock.customer');
+  sessionStorage.removeItem('trimly.accessToken');
+  sessionStorage.removeItem('trimly.user');
+}
+
 export async function signupCustomer(
   customer: CustomerSignupInput,
-): Promise<CustomerSignupResponse> {
+): Promise<SignupResponse> {
   const response = await fetch(`${API_URL}/auth/signup/customer`, {
     method: 'POST',
     headers: {
@@ -98,7 +151,7 @@ export async function signupCustomer(
   });
 
   const body = (await response.json().catch(() => null)) as
-    | CustomerSignupResponse
+    | SignupResponse
     | ErrorResponse
     | null;
 
@@ -110,6 +163,43 @@ export async function signupCustomer(
 
   if (!body || !('user' in body)) {
     throw new AuthApiError('The server returned an invalid signup response', response.status);
+  }
+
+  return body;
+}
+
+export async function signupShopOwner(
+  owner: ShopOwnerSignupInput,
+): Promise<SignupResponse> {
+  const response = await fetch(`${API_URL}/auth/signup/shop-owner`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(owner),
+    cache: 'no-store',
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | SignupResponse
+    | ErrorResponse
+    | null;
+
+  if (!response.ok) {
+    const message = body && 'message' in body ? body.message : undefined;
+    const readableMessage = Array.isArray(message) ? message.join(', ') : message;
+    throw new AuthApiError(
+      readableMessage ?? 'Unable to register your business',
+      response.status,
+    );
+  }
+
+  if (!body || !('user' in body)) {
+    throw new AuthApiError(
+      'The server returned an invalid owner signup response',
+      response.status,
+    );
   }
 
   return body;

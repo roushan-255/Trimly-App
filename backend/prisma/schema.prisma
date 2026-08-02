@@ -36,6 +36,13 @@ enum KycStatus {
   REJECTED
 }
 
+enum BarberMembershipStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+  REVOKED
+}
+
 model User {
   id                    String    @id @default(uuid()) @db.Uuid
   email                 String    @unique
@@ -90,9 +97,10 @@ model ShopOwnerProfile {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shops          Shop[]
-  payoutAccounts PayoutAccount[]
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shops             Shop[]
+  payoutAccounts    PayoutAccount[]
+  barberInvitations ShopBarberMembership[] @relation("BarberMembershipInviter")
 }
 
 model AdminProfile {
@@ -127,35 +135,55 @@ model Shop {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  owner        ShopOwnerProfile @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  barbers      Barber[]
-  services     Service[]
-  appointments Appointment[]
-  reviews      Review[]
-  favoritedBy  FavoriteShop[]
+  owner             ShopOwnerProfile       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  barberMemberships ShopBarberMembership[]
+  services          Service[]
+  appointments      Appointment[]
+  reviews           Review[]
+  favoritedBy       FavoriteShop[]
 
   @@index([ownerId])
   @@index([city])
 }
 
 model Barber {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String?  @unique @db.Uuid
-  shopId      String   @db.Uuid
-  displayName String
-  bio         String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @unique @db.Uuid
+  displayName    String
+  bio            String?
+  isManaged      Boolean  @default(false)
+  isDiscoverable Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  shop            Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user            User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  memberships     ShopBarberMembership[]
   timeSlots       TimeSlot[]
   appointments    Appointment[]
   reviews         Review[]
   portfolioImages PortfolioImage[]
   favoritedBy     FavoriteBarber[]
+}
 
-  @@index([shopId])
+model ShopBarberMembership {
+  id               String                 @id @default(uuid()) @db.Uuid
+  shopId           String                 @db.Uuid
+  barberId         String                 @db.Uuid
+  invitedByOwnerId String?                @db.Uuid
+  status           BarberMembershipStatus @default(PENDING)
+  invitedAt        DateTime               @default(now())
+  respondedAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  shop           Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  barber         Barber            @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  invitedByOwner ShopOwnerProfile? @relation("BarberMembershipInviter", fields: [invitedByOwnerId], references: [id], onDelete: SetNull)
+
+  @@unique([shopId, barberId])
+  @@index([shopId, status])
+  @@index([barberId, status])
+  @@index([invitedByOwnerId])
 }
 
 model Service {
