@@ -2,7 +2,6 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import {
   AdminSignupDto,
-  BarberSignupDto,
   CustomerSignupDto,
   LoginDto,
   ShopOwnerSignupDto,
@@ -20,11 +19,6 @@ export class AuthController {
   @Post("signup/shop-owner")
   signupShopOwner(@Body() dto: ShopOwnerSignupDto) {
     return this.auth.signupShopOwner(dto);
-  }
-
-  @Post("signup/barber")
-  signupBarber(@Body() dto: BarberSignupDto) {
-    return this.auth.signupBarber(dto);
   }
 
   @Post("signup/admin")

@@ -1,7 +1,6 @@
 import {
   ConflictException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Prisma } from "../generated/prisma/client";
@@ -10,7 +9,6 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AccessTokenService } from "./access-token.service";
 import {
   AdminSignupDto,
-  BarberSignupDto,
   CustomerSignupDto,
   LoginDto,
   ShopOwnerSignupDto,
@@ -61,27 +59,20 @@ export class AuthService {
           businessLegalName: dto.businessLegalName,
           gstin: dto.gstin,
           panNumber: dto.panNumber,
-        },
-      },
-    });
-  }
-
-  async signupBarber(dto: BarberSignupDto) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id: dto.shopId },
-      select: { id: true },
-    });
-
-    if (!shop) {
-      throw new NotFoundException("Shop not found");
-    }
-
-    return this.createUser(dto, UserRole.BARBER, {
-      barberProfile: {
-        create: {
-          displayName: dto.displayName,
-          bio: dto.bio,
-          shop: { connect: { id: shop.id } },
+          shops: {
+            create: {
+              name: dto.shop.name,
+              description: dto.shop.description,
+              phone: dto.shop.phone,
+              email: dto.shop.email,
+              addressLine1: dto.shop.addressLine1,
+              addressLine2: dto.shop.addressLine2,
+              city: dto.shop.city,
+              state: dto.shop.state,
+              postalCode: dto.shop.postalCode,
+              country: dto.shop.country,
+            },
+          },
         },
       },
     });
