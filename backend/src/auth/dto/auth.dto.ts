@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsDefined,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -107,6 +108,7 @@ export class ShopOwnerSignupDto extends BaseSignupDto {
   panNumber?: string;
 
   @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => CreateShopDto)
   shop!: CreateShopDto;
