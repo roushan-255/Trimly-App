@@ -8,10 +8,8 @@ import { ShopCard } from './shop-card';
 
 export function ShopGrid({
   limit,
-  search,
 }: {
   limit: number;
-  search?: string;
 }) {
   const [shops, setShops] = useState<PublicShop[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,8 +18,8 @@ export function ShopGrid({
   useEffect(() => {
     setIsLoading(true);
     setError('');
-    getPublicShops({ limit, search })
-      .then(setShops)
+    getPublicShops({ limit })
+      .then(({ items }) => setShops(items))
       .catch((caught: unknown) =>
         setError(
           caught instanceof AuthApiError
@@ -30,7 +28,7 @@ export function ShopGrid({
         ),
       )
       .finally(() => setIsLoading(false));
-  }, [limit, search]);
+  }, [limit]);
 
   if (isLoading) {
     return (
@@ -69,4 +67,3 @@ export function ShopGrid({
     </div>
   );
 }
-

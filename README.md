@@ -37,7 +37,7 @@ The frontend reads its API origin from `NEXT_PUBLIC_API_URL` and defaults to
 
 ```bash
 cp backend/.env.example backend/.env
-# Set DATABASE_URL and JWT_ACCESS_SECRET in backend/.env
+# Set DATABASE_URL, JWT_ACCESS_SECRET, and SEED_OWNER_PASSWORD in backend/.env
 corepack pnpm --dir backend prisma:generate
 corepack pnpm --dir backend exec prisma migrate deploy
 corepack pnpm --dir backend start:dev
@@ -88,7 +88,10 @@ Owner routes require a bearer token issued from a `SHOP_OWNER` login:
 
 Customer-facing shop discovery uses the public database-backed routes:
 
-- `GET /shops`
+- `GET /shops` — location/date search with shop, service, price, rating,
+  verification, sorting, and pagination filters
+- `GET /shops/locations` — locality autocomplete suggestions
+- `GET /shops/service-options` — active service names for a location
 - `GET /shops/:shopId`
 
 Owner signup creates the owner profile and first shop together. Barber accounts
@@ -106,6 +109,8 @@ checks shop ownership before operating on a specific shop.
 - `corepack pnpm --dir frontend build` — build the frontend
 - `corepack pnpm build` — build both applications once the backend is complete
 - `corepack pnpm --dir backend prisma:generate` — regenerate the Prisma client
+- `corepack pnpm --dir backend prisma:seed` — replace the deterministic
+  development dataset with shops, barbers, services, reviews, and availability
 - `corepack pnpm --dir backend exec prisma migrate deploy` — apply checked-in
   database migrations
 

@@ -50,6 +50,7 @@ export default function ShopPage() {
   const address = [
     shop.addressLine1,
     shop.addressLine2,
+    shop.locality,
     shop.city,
     shop.state,
     shop.postalCode,
@@ -67,7 +68,7 @@ export default function ShopPage() {
               <div className="absolute -bottom-24 -right-12 size-72 rounded-full border border-white/10 shadow-[0_0_0_60px_rgba(255,255,255,.025),0_0_0_120px_rgba(255,255,255,.018)]" />
               <div className="relative text-center">
                 <span className="mx-auto grid size-20 place-items-center rounded-3xl border border-white/15 bg-white/10 text-emerald-200 backdrop-blur"><Scissors className="size-10" /></span>
-                <p className="mt-4 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-100">{shop.city}</p>
+                <p className="mt-4 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-100">{shop.locality || shop.city}</p>
               </div>
             </div>
             <div className="self-center">

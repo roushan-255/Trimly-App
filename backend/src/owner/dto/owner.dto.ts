@@ -62,6 +62,12 @@ export class CreateShopDto {
   @MaxLength(255)
   addressLine2?: string;
 
+  @Transform(optionalTrim)
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  locality?: string;
+
   @Transform(trim)
   @IsString()
   @MinLength(2)
@@ -115,4 +121,3 @@ export class CreateBarberDto {
   @MaxLength(2_000)
   bio?: string;
 }
-

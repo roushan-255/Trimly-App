@@ -11,6 +11,7 @@
     "start:prod": "node dist/main",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
+    "prisma:seed": "prisma db seed",
     "prisma:validate": "prisma validate",
     "prisma:studio": "prisma studio"
   },
