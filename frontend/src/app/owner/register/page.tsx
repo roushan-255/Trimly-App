@@ -43,6 +43,7 @@ type OwnerForm = {
   shopEmail: string;
   addressLine1: string;
   addressLine2: string;
+  locality: string;
   city: string;
   state: string;
   postalCode: string;
@@ -65,6 +66,7 @@ const initialForm: OwnerForm = {
   shopEmail: '',
   addressLine1: '',
   addressLine2: '',
+  locality: '',
   city: '',
   state: '',
   postalCode: '',
@@ -132,6 +134,7 @@ export default function OwnerRegisterPage() {
       step === 2 &&
       (!form.shopName.trim() ||
         !form.addressLine1.trim() ||
+        !form.locality.trim() ||
         !form.city.trim() ||
         !form.postalCode.trim() ||
         !form.country.trim())
@@ -185,6 +188,7 @@ export default function OwnerRegisterPage() {
           ...(form.addressLine2.trim() && {
             addressLine2: form.addressLine2.trim(),
           }),
+          ...(form.locality.trim() && { locality: form.locality.trim() }),
           city: form.city.trim(),
           ...(form.state.trim() && { state: form.state.trim() }),
           postalCode: form.postalCode.trim(),
@@ -332,6 +336,7 @@ export default function OwnerRegisterPage() {
                   <div className="sm:col-span-2">
                     <Field label="Address line 2" hint="(optional)" autoComplete="address-line2" placeholder="Near City Mall" value={form.addressLine2} onChange={(event) => update('addressLine2', event.target.value)} />
                   </div>
+                  <Field label="Area / locality" required placeholder="Miyapur" value={form.locality} onChange={(event) => update('locality', event.target.value)} />
                   <Field label="City" required autoComplete="address-level2" value={form.city} onChange={(event) => update('city', event.target.value)} />
                   <Field label="State" hint="(optional)" autoComplete="address-level1" value={form.state} onChange={(event) => update('state', event.target.value)} />
                   <Field label="Postal code" required autoComplete="postal-code" value={form.postalCode} onChange={(event) => update('postalCode', event.target.value)} />

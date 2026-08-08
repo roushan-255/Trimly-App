@@ -140,6 +140,7 @@ model Shop {
   email        String?
   addressLine1 String
   addressLine2 String?
+  locality     String?
   city         String
   state        String?
   postalCode   String
@@ -157,6 +158,7 @@ model Shop {
   favoritedBy       FavoriteShop[]
 
   @@index([ownerId])
+  @@index([locality])
   @@index([city])
 }
 

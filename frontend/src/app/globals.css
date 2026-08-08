@@ -28,6 +28,13 @@ body {
 button, input { font: inherit; }
 a { color: inherit; }
 
+.home-date-input::-webkit-calendar-picker-indicator {
+  width: 0;
+  height: 0;
+  padding: 0;
+  opacity: 0;
+}
+
 .login-shell {
   display: grid;
   min-height: 100svh;

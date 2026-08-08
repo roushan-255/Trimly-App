@@ -39,6 +39,7 @@ export interface ShopRegistrationInput {
   email?: string;
   addressLine1: string;
   addressLine2?: string;
+  locality?: string;
   city: string;
   state?: string;
   postalCode: string;
