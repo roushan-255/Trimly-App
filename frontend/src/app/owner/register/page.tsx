@@ -201,7 +201,6 @@ export default function OwnerRegisterPage() {
         role: 'SHOP_OWNER',
       });
       storeAuthSession(auth);
-      localStorage.removeItem('trimly.mock.customer');
       router.push('/owner/dashboard');
     } catch (caught: unknown) {
       setError(

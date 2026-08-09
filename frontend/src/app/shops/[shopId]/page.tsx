@@ -112,7 +112,7 @@ export default function ShopPage() {
               <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-sm text-slate-500">The owner has not added barbers yet.</div>
             ) : (
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {shop.barbers.map((barber) => <div key={barber.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><span className="grid size-12 place-items-center rounded-full bg-[#0d2231] font-extrabold text-emerald-200">{barber.displayName.slice(0, 1).toUpperCase()}</span><h3 className="mt-4 font-extrabold">{barber.displayName}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{barber.bio || 'Barber at this Trimly location.'}</p></div>)}
+                {shop.barbers.map((barber) => <Link key={barber.id} href={`/shops/${shop.id}/barbers/${barber.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300"><span className="grid size-12 place-items-center rounded-full bg-[#0d2231] font-extrabold text-emerald-200">{barber.displayName.slice(0, 1).toUpperCase()}</span><h3 className="mt-4 font-extrabold">{barber.displayName}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{barber.bio || 'Barber at this Trimly location.'}</p><span className="mt-4 inline-block text-sm font-bold text-emerald-700">View availability →</span></Link>)}
               </div>
             )}
           </article>

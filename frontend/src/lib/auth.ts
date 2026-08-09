@@ -67,6 +67,10 @@ interface ErrorResponse {
 }
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
+export const AUTH_SESSION_CHANGED_EVENT = 'trimly:auth-session-changed';
+const ACCESS_TOKEN_KEY = 'trimly.accessToken';
+const USER_KEY = 'trimly.user';
+const EXPIRES_AT_KEY = 'trimly.expiresAt';
 
 export class AuthApiError extends Error {
   constructor(
@@ -111,17 +115,34 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
 }
 
 export function storeAuthSession(auth: LoginResponse) {
-  localStorage.setItem('trimly.accessToken', auth.accessToken);
-  localStorage.setItem('trimly.user', JSON.stringify(auth.user));
+  localStorage.setItem(ACCESS_TOKEN_KEY, auth.accessToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(auth.user));
+  localStorage.setItem(
+    EXPIRES_AT_KEY,
+    String(Date.now() + auth.expiresIn * 1_000),
+  );
+  notifyAuthSessionChanged();
 }
 
-export function readAuthSession(): { accessToken: string; user: AuthUser } | null {
-  const accessToken = localStorage.getItem('trimly.accessToken');
-  const storedUser = localStorage.getItem('trimly.user');
-  if (!accessToken || !storedUser) return null;
+export function readAuthSession(): {
+  accessToken: string;
+  user: AuthUser;
+  expiresAt: number;
+} | null {
+  if (typeof window === 'undefined') return null;
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const storedUser = localStorage.getItem(USER_KEY);
+  const storedExpiresAt = localStorage.getItem(EXPIRES_AT_KEY);
+  if (!accessToken || !storedUser) {
+    removeAuthSessionStorage();
+    return null;
+  }
 
   try {
     const user = JSON.parse(storedUser) as Partial<AuthUser>;
+    const expiresAt = storedExpiresAt
+      ? Number(storedExpiresAt)
+      : tokenExpiresAt(accessToken);
     if (
       typeof user.id !== 'string' ||
       typeof user.email !== 'string' ||
@@ -129,22 +150,49 @@ export function readAuthSession(): { accessToken: string; user: AuthUser } | nul
       !user.roles.every((role) =>
         ['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(role),
       ) ||
-      !['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(user.role ?? '')
+      !['CUSTOMER', 'SHOP_OWNER', 'BARBER', 'ADMIN'].includes(user.role ?? '') ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Date.now()
     ) {
+      clearAuthSession();
       return null;
     }
-    return { accessToken, user: user as AuthUser };
+    if (!storedExpiresAt) {
+      localStorage.setItem(EXPIRES_AT_KEY, String(expiresAt));
+    }
+    return { accessToken, user: user as AuthUser, expiresAt };
   } catch {
+    clearAuthSession();
     return null;
   }
 }
 
 export function clearAuthSession() {
-  localStorage.removeItem('trimly.accessToken');
-  localStorage.removeItem('trimly.user');
-  localStorage.removeItem('trimly.mock.customer');
-  sessionStorage.removeItem('trimly.accessToken');
-  sessionStorage.removeItem('trimly.user');
+  if (typeof window === 'undefined') return;
+  removeAuthSessionStorage();
+  notifyAuthSessionChanged();
+}
+
+function removeAuthSessionStorage() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(EXPIRES_AT_KEY);
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(EXPIRES_AT_KEY);
+}
+
+function notifyAuthSessionChanged() {
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+}
+
+function tokenExpiresAt(token: string) {
+  const encodedPayload = token.split('.')[1];
+  if (!encodedPayload) return Number.NaN;
+  const base64 = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  const payload = JSON.parse(atob(padded)) as { exp?: unknown };
+  return typeof payload.exp === 'number' ? payload.exp * 1_000 : Number.NaN;
 }
 
 export async function signupCustomer(

@@ -1,4 +1,9 @@
-import { API_URL, AuthApiError } from './auth';
+import {
+  API_URL,
+  AuthApiError,
+  clearAuthSession,
+  readAuthSession,
+} from './auth';
 
 export type ShopSort = 'rating' | 'newest' | 'price_low' | 'price_high';
 
@@ -14,6 +19,53 @@ export interface PublicService {
   description: string | null;
   durationMin: number;
   price: string;
+}
+
+export type SlotStatus = 'AVAILABLE' | 'BOOKED' | 'BLOCKED';
+
+export interface BarberAvailabilitySlot {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  status: SlotStatus;
+  bookable: boolean;
+  occupiedSlotIds: string[];
+}
+
+export interface BarberAvailability {
+  shop: {
+    id: string;
+    name: string;
+    timezone: string;
+  };
+  barber: {
+    id: string;
+    displayName: string;
+    bio: string | null;
+    profileImageUrl: string | null;
+    specialties: string[];
+    rating: number | null;
+    reviewCount: number;
+  };
+  services: PublicService[];
+  selectedServiceIds: string[];
+  totalDurationMin: number;
+  slots: BarberAvailabilitySlot[];
+}
+
+export interface CreateBookingInput {
+  shopId: string;
+  barberId: string;
+  serviceIds: string[];
+  slotIds: string[];
+  notes?: string;
+}
+
+export interface CreateBookingResponse {
+  appointmentIds: string[];
+  status: 'CONFIRMED';
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface PublicShop {
@@ -88,6 +140,7 @@ async function publicShopRequest<T>(path: string): Promise<T> {
     | null;
 
   if (!response.ok) {
+    if (response.status === 401) clearAuthSession();
     const message =
       body && typeof body === 'object' && 'message' in body
         ? body.message
@@ -138,4 +191,58 @@ export function getServiceOptions(location?: string) {
 
 export function getPublicShop(shopId: string) {
   return publicShopRequest<PublicShop>(`/shops/${shopId}`);
+}
+
+export function getBarberAvailability(
+  shopId: string,
+  barberId: string,
+  date: string,
+  serviceIds?: string[],
+) {
+  const params = new URLSearchParams({ date });
+  serviceIds?.forEach((serviceId) => params.append('serviceId', serviceId));
+
+  return publicShopRequest<BarberAvailability>(
+    `/shops/${shopId}/barbers/${barberId}/availability?${params.toString()}`,
+  );
+}
+
+export async function createBooking(input: CreateBookingInput) {
+  const session = readAuthSession();
+  if (!session) throw new AuthApiError('Please sign in again to book.', 401);
+
+  const response = await fetch(
+    `${API_URL}/shops/${input.shopId}/barbers/${input.barberId}/bookings`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({
+        serviceIds: input.serviceIds,
+        slotIds: input.slotIds,
+        notes: input.notes,
+      }),
+      cache: 'no-store',
+    },
+  );
+  const body = (await response.json().catch(() => null)) as
+    | CreateBookingResponse
+    | ErrorResponse
+    | null;
+
+  if (!response.ok) {
+    if (response.status === 401) clearAuthSession();
+    const message =
+      body && 'message' in body
+        ? Array.isArray(body.message)
+          ? body.message.join(', ')
+          : body.message
+        : undefined;
+    throw new AuthApiError(message ?? 'Unable to confirm booking', response.status);
+  }
+
+  return body as CreateBookingResponse;
 }
