@@ -29,7 +29,6 @@ export default function OwnerLoginPage() {
     try {
       const auth = await login({ email, password, role: 'SHOP_OWNER' });
       storeAuthSession(auth);
-      localStorage.removeItem('trimly.mock.customer');
       router.push('/owner/dashboard');
     } catch (caught: unknown) {
       setError(

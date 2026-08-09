@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -128,4 +129,17 @@ export class ServiceOptionsDto {
   @IsString()
   @MaxLength(150)
   location?: string;
+}
+
+export class BarberAvailabilityDto {
+  @Transform(optionalTrim)
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  date!: string;
+
+  @Transform(stringArray)
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsUUID(undefined, { each: true })
+  serviceId?: string[];
 }

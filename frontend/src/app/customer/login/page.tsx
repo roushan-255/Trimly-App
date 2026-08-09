@@ -36,7 +36,7 @@ function CustomerLoginContent() {
     try {
       const auth = await login({ email, password, role: 'CUSTOMER' });
       storeAuthSession(auth);
-      signIn({ firstName: email.split('@')[0], email: auth.user.email });
+      signIn();
       router.push(searchParams.get('returnTo') === '/checkout' ? '/checkout' : '/');
     } catch (caught: unknown) {
       setError(

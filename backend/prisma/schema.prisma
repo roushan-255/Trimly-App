@@ -145,6 +145,7 @@ model Shop {
   state        String?
   postalCode   String
   country      String
+  timezone     String   @default("Asia/Kolkata")
   latitude     Decimal? @db.Decimal(9, 6)
   longitude    Decimal? @db.Decimal(9, 6)
   createdAt    DateTime @default(now())
@@ -163,17 +164,20 @@ model Shop {
 }
 
 model Barber {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String?  @unique @db.Uuid
-  displayName    String
-  bio            String?
-  isManaged      Boolean  @default(false)
-  isDiscoverable Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String?  @unique @db.Uuid
+  displayName     String
+  bio             String?
+  profileImageUrl String?
+  specialties     String[] @default([])
+  isManaged       Boolean  @default(false)
+  isDiscoverable  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user            User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
   memberships     ShopBarberMembership[]
+  services        BarberService[]
   timeSlots       TimeSlot[]
   appointments    Appointment[]
   reviews         Review[]
@@ -215,8 +219,24 @@ model Service {
 
   shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  barbers      BarberService[]
 
   @@index([shopId])
+}
+
+model BarberService {
+  id                  String   @id @default(uuid()) @db.Uuid
+  barberId            String   @db.Uuid
+  serviceId           String   @db.Uuid
+  durationOverrideMin Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  barber  Barber  @relation(fields: [barberId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([barberId, serviceId])
+  @@index([serviceId])
 }
 
 model TimeSlot {

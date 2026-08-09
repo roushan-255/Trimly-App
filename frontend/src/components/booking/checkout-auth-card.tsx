@@ -20,7 +20,7 @@ export function CheckoutAuthCard({ onAuthenticated }: { onAuthenticated: () => v
       if (mode === 'signup') await signupCustomer({ firstName, email, password });
       const auth = await login({ email, password, role: 'CUSTOMER' });
       storeAuthSession(auth);
-      signIn({ firstName: firstName || email.split('@')[0], email: auth.user.email });
+      signIn();
       onAuthenticated();
     } catch (caught: unknown) {
       setError(caught instanceof AuthApiError ? caught.message : 'Unable to reach the server. Check that the backend is running.');

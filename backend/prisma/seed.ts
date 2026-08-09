@@ -369,10 +369,94 @@ function startOfTodayInHyderabad() {
   return new Date(`${part("year")}-${part("month")}-${part("day")}T00:00:00+05:30`);
 }
 
+async function seedManagedBarberAvailability(prisma: PrismaClient) {
+  const availabilityStart = startOfTodayInHyderabad();
+  const availabilityEnd = new Date(
+    availabilityStart.getTime() + 14 * 24 * 60 * 60 * 1_000,
+  );
+  const barbers = await prisma.barber.findMany({
+    where: {
+      isManaged: true,
+      memberships: { some: { status: BarberMembershipStatus.ACTIVE } },
+    },
+    select: { id: true },
+  });
+
+  await prisma.$executeRaw`
+    UPDATE "TimeSlot" AS slot
+    SET
+      "endsAt" = slot."startsAt" + INTERVAL '10 minutes',
+      "updatedAt" = CURRENT_TIMESTAMP
+    WHERE slot."status" = 'AVAILABLE'::"TimeSlotStatus"
+      AND slot."startsAt" >= CAST(${availabilityStart} AS timestamp)
+      AND slot."startsAt" < CAST(${availabilityEnd} AS timestamp)
+      AND EXISTS (
+        SELECT 1
+        FROM "Barber" AS barber
+        JOIN "ShopBarberMembership" AS membership
+          ON membership."barberId" = barber."id"
+        WHERE barber."id" = slot."barberId"
+          AND barber."isManaged" = true
+          AND membership."status" = 'ACTIVE'::"BarberMembershipStatus"
+      )
+  `;
+
+  await prisma.$executeRaw`
+    INSERT INTO "TimeSlot"
+      ("id", "barberId", "startsAt", "endsAt", "status", "createdAt", "updatedAt")
+    SELECT
+      gen_random_uuid(),
+      barber."id",
+      CAST(${availabilityStart} AS timestamp) + day_number * INTERVAL '1 day' + minute_of_day * INTERVAL '1 minute',
+      CAST(${availabilityStart} AS timestamp) + day_number * INTERVAL '1 day' + (minute_of_day + 10) * INTERVAL '1 minute',
+      'AVAILABLE'::"TimeSlotStatus",
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP
+    FROM "Barber" AS barber
+    CROSS JOIN generate_series(0, 13) AS days(day_number)
+    CROSS JOIN generate_series(600, 1320, 10) AS minutes(minute_of_day)
+    WHERE barber."isManaged" = true
+      AND EXISTS (
+        SELECT 1
+        FROM "ShopBarberMembership" AS membership
+        WHERE membership."barberId" = barber."id"
+          AND membership."status" = 'ACTIVE'::"BarberMembershipStatus"
+      )
+    ON CONFLICT ("barberId", "startsAt") DO NOTHING
+  `;
+
+  const publishedCount = await prisma.timeSlot.count({
+    where: {
+      barber: {
+        isManaged: true,
+        memberships: { some: { status: BarberMembershipStatus.ACTIVE } },
+      },
+      status: TimeSlotStatus.AVAILABLE,
+      startsAt: { gte: availabilityStart, lt: availabilityEnd },
+    },
+  });
+
+  console.log(
+    `Published ${publishedCount} ten-minute slots for ${barbers.length} managed barbers.`,
+  );
+}
+
 async function main() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is required to seed the database");
+  }
+
+  const adapter = new PrismaPg({ connectionString });
+  const prisma = new PrismaClient({ adapter });
+
+  if (process.env.SEED_AVAILABILITY_ONLY === "true") {
+    try {
+      await seedManagedBarberAvailability(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+    return;
   }
 
   const ownerPassword = process.env.SEED_OWNER_PASSWORD?.trim();
@@ -381,9 +465,6 @@ async function main() {
       "SEED_OWNER_PASSWORD with at least 12 characters is required to seed owner accounts",
     );
   }
-
-  const adapter = new PrismaPg({ connectionString });
-  const prisma = new PrismaClient({ adapter });
 
   try {
     const passwordHash = await new PasswordService().hash(ownerPassword);
@@ -553,7 +634,7 @@ async function main() {
             shopId,
             name: serviceSeed.name,
             description: serviceSeed.description,
-            durationMin: serviceSeed.durationMin,
+            durationMin: 10,
             price: serviceSeed.price + areaPriceAdjustment,
             isActive: true,
           },
@@ -562,7 +643,7 @@ async function main() {
             shopId,
             name: serviceSeed.name,
             description: serviceSeed.description,
-            durationMin: serviceSeed.durationMin,
+            durationMin: 10,
             price: serviceSeed.price + areaPriceAdjustment,
             isActive: true,
           },
@@ -587,6 +668,7 @@ async function main() {
           update: {
             displayName,
             bio: `Specialises in ${specialty}`,
+            specialties: [specialty],
             isManaged: true,
             isDiscoverable: true,
           },
@@ -594,6 +676,7 @@ async function main() {
             id: barberId,
             displayName,
             bio: `Specialises in ${specialty}`,
+            specialties: [specialty],
             isManaged: true,
             isDiscoverable: true,
           },
@@ -619,19 +702,23 @@ async function main() {
         });
 
         for (let day = 0; day < 14; day += 1) {
-          for (const hour of [10, 16]) {
+          for (
+            let minuteOfDay = 10 * 60;
+            minuteOfDay <= 22 * 60;
+            minuteOfDay += 10
+          ) {
             const startsAt = new Date(
               availabilityStart.getTime() +
                 day * 24 * 60 * 60 * 1_000 +
-                hour * 60 * 60 * 1_000,
+                minuteOfDay * 60 * 1_000,
             );
             timeSlots.push({
               id: deterministicUuid(
-                `availability:${shopSeed.key}:${barberIndex}:${day}:${hour}`,
+                `availability:${shopSeed.key}:${barberIndex}:${day}:${minuteOfDay}`,
               ),
               barberId,
               startsAt,
-              endsAt: new Date(startsAt.getTime() + 90 * 60 * 1_000),
+              endsAt: new Date(startsAt.getTime() + 10 * 60 * 1_000),
               status: TimeSlotStatus.AVAILABLE,
             });
           }
