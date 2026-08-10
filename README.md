@@ -94,6 +94,20 @@ Customer-facing shop discovery uses the public database-backed routes:
 - `GET /shops/service-options` — active service names for a location
 - `GET /shops/:shopId`
 
+Customer booking management requires a bearer token issued from a `CUSTOMER`
+login:
+
+- `GET /customer/bookings` — upcoming and past bookings grouped by checkout
+- `PATCH /customer/bookings/:bookingGroupId/cancel` — cancel the complete
+  booking and release its slots
+- `PATCH /customer/bookings/:bookingGroupId/reschedule` — atomically reserve
+  replacement slots and release the old ones
+- `POST /customer/bookings/:bookingGroupId/review` — submit separate shop and
+  barber ratings for a completed booking
+
+The customer booking page is available at http://localhost:3000/bookings.
+Multi-service appointments are displayed and managed as one booking.
+
 Owner signup creates the owner profile and first shop together. Barber accounts
 can only be added through the protected owner route, which verifies that the
 shop belongs to the authenticated owner. Admin signup is intentionally public

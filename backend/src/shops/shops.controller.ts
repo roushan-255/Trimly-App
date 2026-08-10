@@ -51,6 +51,14 @@ export class ShopsController {
     return this.shops.barberAvailability(shopId, barberId, query);
   }
 
+  @Get(":shopId/barbers/:barberId/reviews")
+  barberReviews(
+    @Param("shopId", ParseUUIDPipe) shopId: string,
+    @Param("barberId", ParseUUIDPipe) barberId: string,
+  ) {
+    return this.shops.barberReviews(shopId, barberId);
+  }
+
   @Post(":shopId/barbers/:barberId/bookings")
   @Roles(UserRole.CUSTOMER)
   @UseGuards(BearerTokenGuard, RolesGuard)
@@ -61,6 +69,11 @@ export class ShopsController {
     @Body() body: CreateBookingDto,
   ) {
     return this.shops.createBooking(user, shopId, barberId, body);
+  }
+
+  @Get(":shopId/reviews")
+  reviews(@Param("shopId", ParseUUIDPipe) shopId: string) {
+    return this.shops.reviews(shopId);
   }
 
   @Get(":shopId")

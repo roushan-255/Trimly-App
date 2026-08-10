@@ -30,7 +30,8 @@ function SignupContent() {
       const auth = await login({ email, password, role: 'CUSTOMER' });
       storeAuthSession(auth);
       signIn();
-      router.push(params.get('returnTo') === '/checkout' ? '/checkout' : '/');
+      const returnTo = params.get('returnTo');
+      router.push(returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/');
     } catch (caught: unknown) {
       setError(caught instanceof AuthApiError ? caught.message : 'Unable to reach the server. Check that the backend is running.');
     } finally {

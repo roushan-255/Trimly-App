@@ -37,7 +37,8 @@ function CustomerLoginContent() {
       const auth = await login({ email, password, role: 'CUSTOMER' });
       storeAuthSession(auth);
       signIn();
-      router.push(searchParams.get('returnTo') === '/checkout' ? '/checkout' : '/');
+      const returnTo = searchParams.get('returnTo');
+      router.push(returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/');
     } catch (caught: unknown) {
       setError(
         caught instanceof AuthApiError

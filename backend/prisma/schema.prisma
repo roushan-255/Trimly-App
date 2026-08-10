@@ -249,7 +249,7 @@ model TimeSlot {
   updatedAt DateTime       @updatedAt
 
   barber      Barber       @relation(fields: [barberId], references: [id], onDelete: Cascade)
-  appointment Appointment?
+  appointments Appointment[]
 
   @@unique([barberId, startsAt])
   @@index([barberId, startsAt])
@@ -257,11 +257,12 @@ model TimeSlot {
 
 model Appointment {
   id         String            @id @default(uuid()) @db.Uuid
+  bookingGroupId String        @default(uuid()) @db.Uuid
   customerId String            @db.Uuid
   shopId     String            @db.Uuid
   barberId   String            @db.Uuid
   serviceId  String            @db.Uuid
-  timeSlotId String            @unique @db.Uuid
+  timeSlotId String            @db.Uuid
   status     AppointmentStatus @default(PENDING)
   notes      String?
   createdAt  DateTime          @default(now())
@@ -275,8 +276,10 @@ model Appointment {
   review   Review?
 
   @@index([customerId, createdAt])
+  @@index([customerId, bookingGroupId])
   @@index([shopId, status])
   @@index([barberId, status])
+  @@index([timeSlotId])
 }
 
 model Review {
@@ -285,8 +288,10 @@ model Review {
   shopId        String   @db.Uuid
   barberId      String?  @db.Uuid
   appointmentId String   @unique @db.Uuid
-  rating        Int
-  comment       String?
+  shopRating    Int
+  shopComment   String?
+  barberRating  Int
+  barberComment String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
