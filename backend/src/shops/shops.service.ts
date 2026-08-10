@@ -54,6 +54,9 @@ const publicShopSelect = {
           id: true,
           displayName: true,
           bio: true,
+          reviews: {
+            select: { shopId: true, barberRating: true },
+          },
         },
       },
     },
@@ -199,6 +202,104 @@ export class ShopsService {
     }
 
     return this.toPublicShop(shop);
+  }
+
+  async reviews(shopId: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: {
+        id: true,
+        name: true,
+        reviews: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            shopRating: true,
+            shopComment: true,
+            createdAt: true,
+            customer: {
+              select: { firstName: true, lastName: true, avatar: true },
+            },
+            barber: { select: { displayName: true } },
+          },
+        },
+      },
+    });
+
+    if (!shop) throw new NotFoundException("Shop not found");
+
+    return {
+      subject: { id: shop.id, name: shop.name },
+      reviews: shop.reviews.map((review) => ({
+        id: review.id,
+        rating: review.shopRating,
+        comment: review.shopComment,
+        createdAt: review.createdAt,
+        customer: {
+          name: [review.customer.firstName, review.customer.lastName]
+            .filter(Boolean)
+            .join(" "),
+          avatar: review.customer.avatar,
+        },
+        barberName: review.barber?.displayName ?? null,
+      })),
+    };
+  }
+
+  async barberReviews(shopId: string, barberId: string) {
+    const membership = await this.prisma.shopBarberMembership.findFirst({
+      where: {
+        shopId,
+        barberId,
+        status: BarberMembershipStatus.ACTIVE,
+        barber: { isDiscoverable: true },
+      },
+      select: {
+        barber: {
+          select: {
+            id: true,
+            displayName: true,
+            reviews: {
+              where: { shopId },
+              orderBy: { createdAt: "desc" },
+              select: {
+                id: true,
+                barberRating: true,
+                barberComment: true,
+                createdAt: true,
+                customer: {
+                  select: { firstName: true, lastName: true, avatar: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundException("Active barber not found for this shop");
+    }
+
+    return {
+      subject: {
+        id: membership.barber.id,
+        name: membership.barber.displayName,
+      },
+      reviews: membership.barber.reviews.map((review) => ({
+        id: review.id,
+        rating: review.barberRating,
+        comment: review.barberComment,
+        createdAt: review.createdAt,
+        customer: {
+          name: [review.customer.firstName, review.customer.lastName]
+            .filter(Boolean)
+            .join(" "),
+          avatar: review.customer.avatar,
+        },
+        barberName: null,
+      })),
+    };
   }
 
   async barberAvailability(
@@ -785,7 +886,24 @@ export class ShopsService {
       serviceCount: shop.services.length,
       startingPrice:
         shop.services.length > 0 ? shop.services[0].price.toString() : null,
-      barbers: shop.barberMemberships.map(({ barber }) => barber),
+      barbers: shop.barberMemberships.map(({ barber }) => {
+        const reviews = barber.reviews.filter(
+          (review) => review.shopId === shop.id,
+        );
+        const rating = reviews.length
+          ? reviews.reduce(
+              (total, review) => total + review.barberRating,
+              0,
+            ) / reviews.length
+          : null;
+        return {
+          id: barber.id,
+          displayName: barber.displayName,
+          bio: barber.bio,
+          rating: rating === null ? null : Number(rating.toFixed(1)),
+          reviewCount: reviews.length,
+        };
+      }),
       services: shop.services.map((service) => ({
         ...service,
         price: service.price.toString(),

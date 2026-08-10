@@ -134,6 +134,11 @@ function BookingsContent() {
             <CheckCircle2 className="size-5" /> Your booking has been rescheduled.
           </p>
         )}
+        {searchParams.get('confirmed') === '1' && (
+          <p className="mb-6 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800">
+            <CheckCircle2 className="size-5" /> Your booking has been confirmed and added to your upcoming appointments.
+          </p>
+        )}
         {error && (
           <p role="alert" className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
             {error}

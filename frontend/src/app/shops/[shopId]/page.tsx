@@ -16,14 +16,17 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
+import { BarberReviewsDrawer, ShopReviewsDrawer } from '@/components/shops/shop-reviews-drawer';
 import { AuthApiError } from '@/lib/auth';
-import { PublicShop, getPublicShop } from '@/lib/shops';
+import { PublicBarber, PublicShop, getPublicShop } from '@/lib/shops';
 
 export default function ShopPage() {
   const params = useParams<{ shopId: string }>();
   const [shop, setShop] = useState<PublicShop | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewedBarber, setReviewedBarber] = useState<PublicBarber | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -73,7 +76,7 @@ export default function ShopPage() {
             </div>
             <div className="self-center">
               <div className="flex flex-wrap items-center gap-3">
-                {shop.rating === null ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">New on Trimly</span> : <p className="flex items-center gap-1 text-sm font-bold text-amber-600"><Star className="size-4 fill-current" /> {shop.rating} · {shop.reviewCount} reviews</p>}
+                {shop.rating === null ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">New on Trimly</span> : <button type="button" onClick={() => setReviewsOpen(true)} className="group relative isolate flex items-center gap-1 px-1 py-1 text-sm font-bold text-amber-600 transition-colors duration-200 before:pointer-events-none before:absolute before:-inset-x-1 before:-inset-y-1 before:-z-10 before:rounded-full before:bg-amber-200/0 before:blur-sm before:transition-colors before:duration-200 hover:text-amber-700 hover:before:bg-amber-200/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"><Star className="size-4 fill-current transition-transform duration-200 group-hover:scale-110" /> {shop.rating} · {shop.reviewCount} reviews</button>}
                 {shop.verified && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700"><BadgeCheck className="size-4" /> Verified</span>}
               </div>
               <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl">{shop.name}</h1>
@@ -112,7 +115,7 @@ export default function ShopPage() {
               <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-sm text-slate-500">The owner has not added barbers yet.</div>
             ) : (
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {shop.barbers.map((barber) => <Link key={barber.id} href={`/shops/${shop.id}/barbers/${barber.id}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300"><span className="grid size-12 place-items-center rounded-full bg-[#0d2231] font-extrabold text-emerald-200">{barber.displayName.slice(0, 1).toUpperCase()}</span><h3 className="mt-4 font-extrabold">{barber.displayName}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{barber.bio || 'Barber at this Trimly location.'}</p><span className="mt-4 inline-block text-sm font-bold text-emerald-700">View availability →</span></Link>)}
+                {shop.barbers.map((barber) => <article key={barber.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300"><div className="flex items-center gap-3"><span className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0d2231] font-extrabold text-emerald-200">{barber.displayName.slice(0, 1).toUpperCase()}</span>{barber.rating === null ? <span className="text-xs font-bold text-slate-400">New</span> : <button type="button" onClick={() => setReviewedBarber(barber)} className="group relative isolate flex items-center gap-1 px-1 py-1 text-sm font-bold text-amber-600 transition-colors duration-200 before:pointer-events-none before:absolute before:-inset-x-1 before:-inset-y-1 before:-z-10 before:rounded-full before:bg-amber-200/0 before:blur-sm before:transition-colors before:duration-200 hover:text-amber-700 hover:before:bg-amber-200/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"><Star className="size-4 fill-current transition-transform duration-200 group-hover:scale-110" /> {barber.rating} · {barber.reviewCount} {barber.reviewCount === 1 ? 'review' : 'reviews'}</button>}</div><h3 className="mt-4 font-extrabold">{barber.displayName}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{barber.bio || 'Barber at this Trimly location.'}</p><Link href={`/shops/${shop.id}/barbers/${barber.id}`} className="mt-4 inline-block text-sm font-bold text-emerald-700 hover:text-emerald-800">View availability →</Link></article>)}
               </div>
             )}
           </article>
@@ -130,6 +133,12 @@ export default function ShopPage() {
           </div>
         </aside>
       </section>
+      {shop.rating !== null && (
+        <ShopReviewsDrawer open={reviewsOpen} shopId={shop.id} shopName={shop.name} rating={shop.rating} reviewCount={shop.reviewCount} onClose={() => setReviewsOpen(false)} />
+      )}
+      {reviewedBarber && reviewedBarber.rating !== null && (
+        <BarberReviewsDrawer open shopId={shop.id} barberId={reviewedBarber.id} barberName={reviewedBarber.displayName} rating={reviewedBarber.rating} reviewCount={reviewedBarber.reviewCount} onClose={() => setReviewedBarber(null)} />
+      )}
     </main>
   );
 }

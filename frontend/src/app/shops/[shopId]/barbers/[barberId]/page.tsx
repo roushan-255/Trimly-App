@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
+import { BarberReviewsDrawer } from '@/components/shops/shop-reviews-drawer';
 import { AuthApiError } from '@/lib/auth';
 import { rescheduleCustomerBooking } from '@/lib/customer';
 import {
@@ -76,6 +77,7 @@ export default function BarberAvailabilityPage() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -266,10 +268,10 @@ export default function BarberAvailabilityPage() {
                 {barber.displayName}
               </h1>
               {barber.rating !== null && (
-                <p className="mt-2 flex items-center gap-1 text-sm font-bold text-amber-600">
-                  <Star className="size-4 fill-current" /> {barber.rating} ·{' '}
+                <button type="button" onClick={() => setReviewsOpen(true)} className="group relative isolate mt-2 flex items-center gap-1 px-1 py-1 text-sm font-bold text-amber-600 transition-colors duration-200 before:pointer-events-none before:absolute before:-inset-x-1 before:-inset-y-1 before:-z-10 before:rounded-full before:bg-amber-200/0 before:blur-sm before:transition-colors before:duration-200 hover:text-amber-700 hover:before:bg-amber-200/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                  <Star className="size-4 fill-current transition-transform duration-200 group-hover:scale-110" /> {barber.rating} ·{' '}
                   {barber.reviewCount} reviews
-                </p>
+                </button>
               )}
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                 {barber.bio || 'Barber at this Trimly location.'}
@@ -496,6 +498,9 @@ export default function BarberAvailabilityPage() {
           </aside>
         </div>
       </div>
+      {barber.rating !== null && (
+        <BarberReviewsDrawer open={reviewsOpen} shopId={shopId} barberId={barber.id} barberName={barber.displayName} rating={barber.rating} reviewCount={barber.reviewCount} onClose={() => setReviewsOpen(false)} />
+      )}
     </main>
   );
 }

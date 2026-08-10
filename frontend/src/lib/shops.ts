@@ -11,6 +11,8 @@ export interface PublicBarber {
   id: string;
   displayName: string;
   bio: string | null;
+  rating: number | null;
+  reviewCount: number;
 }
 
 export interface PublicService {
@@ -91,6 +93,23 @@ export interface PublicShop {
   startingPrice: string | null;
   barbers: PublicBarber[];
   services: PublicService[];
+}
+
+export interface PublicShopReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  customer: {
+    name: string;
+    avatar: string | null;
+  };
+  barberName: string | null;
+}
+
+export interface PublicShopReviewsResponse {
+  subject: { id: string; name: string };
+  reviews: PublicShopReview[];
 }
 
 export interface ShopSearchParams {
@@ -192,6 +211,16 @@ export function getServiceOptions(location?: string) {
 
 export function getPublicShop(shopId: string) {
   return publicShopRequest<PublicShop>(`/shops/${shopId}`);
+}
+
+export function getPublicShopReviews(shopId: string) {
+  return publicShopRequest<PublicShopReviewsResponse>(`/shops/${shopId}/reviews`);
+}
+
+export function getPublicBarberReviews(shopId: string, barberId: string) {
+  return publicShopRequest<PublicShopReviewsResponse>(
+    `/shops/${shopId}/barbers/${barberId}/reviews`,
+  );
 }
 
 export function getBarberAvailability(
