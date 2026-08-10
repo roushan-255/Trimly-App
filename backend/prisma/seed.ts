@@ -770,8 +770,10 @@ async function main() {
           shopId,
           barberId,
           appointmentId,
-          rating,
-          comment: reviewComments[(shopIndex + reviewIndex) % reviewComments.length],
+          shopRating: rating,
+          shopComment: reviewComments[(shopIndex + reviewIndex) % reviewComments.length],
+          barberRating: rating,
+          barberComment: reviewComments[(shopIndex + reviewIndex) % reviewComments.length],
         });
       }
 

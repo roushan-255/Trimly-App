@@ -13,6 +13,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
 import { AuthApiError } from '@/lib/auth';
+import { rescheduleCustomerBooking } from '@/lib/customer';
 import {
   BarberAvailability,
   BarberAvailabilitySlot,
@@ -60,6 +61,7 @@ export default function BarberAvailabilityPage() {
   }>();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const rescheduleId = searchParams.get('reschedule') || '';
   const [date, setDate] = useState(
     searchParams.get('date') || dateInTimezone(),
   );
@@ -72,6 +74,8 @@ export default function BarberAvailabilityPage() {
     useState<BarberAvailabilitySlot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -130,8 +134,33 @@ export default function BarberAvailabilityPage() {
     if (availability && date < shopToday) setDate(shopToday);
   }, [availability, date, shopToday]);
 
-  function continueBooking() {
+  async function continueBooking() {
     if (!availability || !selectedSlot || selectedServices.length === 0) {
+      return;
+    }
+
+    if (rescheduleId) {
+      setIsSubmitting(true);
+      setActionError('');
+      try {
+        await rescheduleCustomerBooking(
+          rescheduleId,
+          selectedSlot.occupiedSlotIds,
+        );
+        router.push('/bookings?rescheduled=1');
+      } catch (caught: unknown) {
+        if (caught instanceof AuthApiError && caught.status === 401) {
+          router.push('/customer/login?returnTo=/bookings');
+          return;
+        }
+        setActionError(
+          caught instanceof AuthApiError
+            ? caught.message
+            : 'Unable to reschedule this booking.',
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -157,6 +186,7 @@ export default function BarberAvailabilityPage() {
   }
 
   function toggleService(serviceId: string) {
+    if (rescheduleId) return;
     setServiceIds((current) => {
       if (!current.includes(serviceId)) return [...current, serviceId];
       if (current.length === 1) return current;
@@ -260,6 +290,12 @@ export default function BarberAvailabilityPage() {
           )}
         </section>
 
+        {rescheduleId && (
+          <p className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-800">
+            Choose a new date and time. Your original appointment remains reserved until the change succeeds.
+          </p>
+        )}
+
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_.34fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -296,9 +332,10 @@ export default function BarberAvailabilityPage() {
                     <button
                       key={service.id}
                       type="button"
+                      disabled={Boolean(rescheduleId)}
                       aria-pressed={serviceIds.includes(service.id)}
                       onClick={() => toggleService(service.id)}
-                      className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition ${
+                      className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed ${
                         serviceIds.includes(service.id)
                           ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200'
                           : 'border-slate-200 bg-white hover:border-emerald-300'
@@ -436,14 +473,25 @@ export default function BarberAvailabilityPage() {
             )}
             <button
               type="button"
-              disabled={!selectedSlot || selectedServices.length === 0}
-              onClick={continueBooking}
+              disabled={!selectedSlot || selectedServices.length === 0 || isSubmitting}
+              onClick={() => void continueBooking()}
               className="mt-7 w-full rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              Continue booking
+              {isSubmitting
+                ? 'Rescheduling…'
+                : rescheduleId
+                  ? 'Confirm new time'
+                  : 'Continue booking'}
             </button>
+            {actionError && (
+              <p role="alert" className="mt-3 text-center text-xs font-semibold text-rose-600">
+                {actionError}
+              </p>
+            )}
             <p className="mt-3 text-center text-xs leading-5 text-slate-500">
-              No login is needed to choose a time.
+              {rescheduleId
+                ? 'Your old time is released only after this change is confirmed.'
+                : 'No login is needed to choose a time.'}
             </p>
           </aside>
         </div>

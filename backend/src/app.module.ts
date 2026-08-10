@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
+import { CustomerModule } from "./customer/customer.module";
 import { OwnerModule } from "./owner/owner.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ShopsModule } from "./shops/shops.module";
@@ -13,6 +14,7 @@ import { ShopsModule } from "./shops/shops.module";
     }),
     PrismaModule,
     AuthModule,
+    CustomerModule,
     OwnerModule,
     ShopsModule,
   ],

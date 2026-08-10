@@ -71,7 +71,7 @@ const publicShopSelect = {
   },
   reviews: {
     select: {
-      rating: true,
+      shopRating: true,
     },
   },
 } satisfies Prisma.ShopSelect;
@@ -223,7 +223,7 @@ export class ShopsService {
             specialties: true,
             reviews: {
               where: { shopId },
-              select: { rating: true },
+              select: { barberRating: true },
             },
             services: {
               select: {
@@ -318,7 +318,7 @@ export class ShopsService {
     const rating = reviews.length
       ? Number(
           (
-            reviews.reduce((total, review) => total + review.rating, 0) /
+            reviews.reduce((total, review) => total + review.barberRating, 0) /
             reviews.length
           ).toFixed(1),
         )
@@ -363,6 +363,7 @@ export class ShopsService {
     barberId: string,
     dto: CreateBookingDto,
   ) {
+    const bookingGroupId = randomUUID();
     const serviceIds = [...new Set(dto.serviceIds)];
     const slotIds = [...new Set(dto.slotIds)];
 
@@ -464,6 +465,7 @@ export class ShopsService {
 
           const appointments = slots.map((slot, index) => ({
             id: randomUUID(),
+            bookingGroupId,
             customerId: customer.id,
             shopId,
             barberId,
@@ -475,6 +477,7 @@ export class ShopsService {
           await transaction.appointment.createMany({ data: appointments });
 
           return {
+            bookingGroupId,
             appointmentIds: appointments.map((appointment) => appointment.id),
             status: AppointmentStatus.CONFIRMED,
             startsAt: slots[0].startsAt,
@@ -757,7 +760,7 @@ export class ShopsService {
     const reviewCount = shop.reviews.length;
     const rating =
       reviewCount > 0
-        ? shop.reviews.reduce((total, review) => total + review.rating, 0) /
+        ? shop.reviews.reduce((total, review) => total + review.shopRating, 0) /
           reviewCount
         : null;
 

@@ -62,6 +62,7 @@ export interface CreateBookingInput {
 }
 
 export interface CreateBookingResponse {
+  bookingGroupId: string;
   appointmentIds: string[];
   status: 'CONFIRMED';
   startsAt: string;
