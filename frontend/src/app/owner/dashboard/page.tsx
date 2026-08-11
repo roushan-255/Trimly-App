@@ -260,7 +260,7 @@ export default function OwnerDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-slate-950 lg:grid lg:grid-cols-[270px_1fr]">
-      <aside className="hidden min-h-screen border-r border-white/10 bg-[#0d2231] p-6 text-white lg:flex lg:flex-col">
+      <aside className="hidden min-h-screen border-r border-white/10 bg-[#0d2231] p-6 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start lg:flex-col lg:overflow-hidden">
         <Link href="/" className="inline-flex items-center gap-3 text-xl font-extrabold tracking-tight">
           <span className="grid size-10 -rotate-6 place-items-center rounded-xl bg-emerald-200 text-[#0d2231]">
             <Scissors className="size-5" />
