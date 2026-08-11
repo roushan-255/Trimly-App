@@ -65,7 +65,7 @@ export class CustomerService {
     const appointments = await this.prisma.appointment.findMany({
       where: { customerId },
       include: bookingInclude,
-      orderBy: { timeSlot: { startsAt: "desc" } },
+      orderBy: { createdAt: "desc" },
     });
     const groups = new Map<string, BookingAppointment[]>();
 
@@ -100,6 +100,7 @@ export class CustomerService {
           id: true,
           status: true,
           timeSlotId: true,
+          scheduledDate: true,
           timeSlot: { select: { startsAt: true } },
         },
       });
@@ -111,7 +112,11 @@ export class CustomerService {
       });
       await transaction.timeSlot.updateMany({
         where: {
-          id: { in: appointments.map(({ timeSlotId }) => timeSlotId) },
+          id: {
+            in: appointments.flatMap(({ timeSlotId }) =>
+              timeSlotId ? [timeSlotId] : [],
+            ),
+          },
           status: TimeSlotStatus.BOOKED,
         },
         data: { status: TimeSlotStatus.AVAILABLE },
@@ -126,106 +131,51 @@ export class CustomerService {
     bookingGroupId: string,
     dto: RescheduleBookingDto,
   ) {
-    const slotIds = [...new Set(dto.slotIds)];
-    if (slotIds.length !== dto.slotIds.length) {
-      throw new BadRequestException("Slots cannot be duplicated");
-    }
     const customerId = await this.customerId(user.id);
 
     return this.handleBookingTransaction(async (transaction) => {
       const appointments = await transaction.appointment.findMany({
         where: { bookingGroupId, customerId },
-        orderBy: { timeSlot: { startsAt: "asc" } },
+        orderBy: { createdAt: "asc" },
         select: {
           id: true,
           status: true,
           shopId: true,
           barberId: true,
           timeSlotId: true,
+          scheduledDate: true,
           timeSlot: { select: { startsAt: true } },
         },
       });
       this.assertChangeable(appointments, "reschedule");
 
-      if (slotIds.length !== appointments.length) {
-        throw new BadRequestException(
-          "Select the same number of 10-minute slots as the original booking",
-        );
-      }
-      const originalSlotIds = new Set(
-        appointments.map(({ timeSlotId }) => timeSlotId),
-      );
-      if (slotIds.some((slotId) => originalSlotIds.has(slotId))) {
-        throw new BadRequestException("Please choose a new appointment time");
-      }
-
       const [{ shopId, barberId }] = appointments;
-      const [membership, slots] = await Promise.all([
-        transaction.shopBarberMembership.findFirst({
-          where: {
-            shopId,
-            barberId,
-            status: BarberMembershipStatus.ACTIVE,
-          },
-          select: { id: true },
-        }),
-        transaction.timeSlot.findMany({
-          where: { id: { in: slotIds }, barberId },
-          orderBy: { startsAt: "asc" },
-          select: {
-            id: true,
-            startsAt: true,
-            endsAt: true,
-            status: true,
-          },
-        }),
-      ]);
+      const membership = await transaction.shopBarberMembership.findFirst({
+        where: {
+          shopId,
+          barberId,
+          status: BarberMembershipStatus.ACTIVE,
+        },
+        select: { id: true },
+      });
 
       if (!membership) {
         throw new NotFoundException("This barber is no longer active at the shop");
       }
-      if (slots.length !== slotIds.length) {
-        throw new ConflictException("One or more slots are no longer available");
+      const scheduledDate = new Date(`${dto.date}T00:00:00.000Z`);
+      if (scheduledDate.getTime() + 86_400_000 <= Date.now()) {
+        throw new BadRequestException("Choose today or a future date");
       }
-
-      const now = new Date();
-      slots.forEach((slot, index) => {
-        if (
-          slot.status !== TimeSlotStatus.AVAILABLE ||
-          slot.startsAt <= now ||
-          slot.endsAt.getTime() - slot.startsAt.getTime() !== 600_000 ||
-          (index > 0 && slot.startsAt.getTime() !== slots[index - 1].endsAt.getTime())
-        ) {
-          throw new ConflictException(
-            "Choose consecutive, available 10-minute slots in the future",
-          );
-        }
+      const originalSlotIds = appointments.flatMap(({ timeSlotId }) =>
+        timeSlotId ? [timeSlotId] : [],
+      );
+      await transaction.appointment.updateMany({
+        where: { bookingGroupId, customerId },
+        data: { scheduledDate, timeSlotId: null },
       });
-
-      const reserved = await transaction.timeSlot.updateMany({
-        where: {
-          id: { in: slotIds },
-          barberId,
-          status: TimeSlotStatus.AVAILABLE,
-          startsAt: { gt: now },
-        },
-        data: { status: TimeSlotStatus.BOOKED },
-      });
-      if (reserved.count !== slots.length) {
-        throw new ConflictException(
-          "These slots were just booked by another customer",
-        );
-      }
-
-      for (let index = 0; index < appointments.length; index += 1) {
-        await transaction.appointment.update({
-          where: { id: appointments[index].id },
-          data: { timeSlotId: slots[index].id },
-        });
-      }
       await transaction.timeSlot.updateMany({
         where: {
-          id: { in: [...originalSlotIds] },
+          id: { in: originalSlotIds },
           status: TimeSlotStatus.BOOKED,
         },
         data: { status: TimeSlotStatus.AVAILABLE },
@@ -234,8 +184,7 @@ export class CustomerService {
       return {
         bookingGroupId,
         status: appointments[0].status,
-        startsAt: slots[0].startsAt,
-        endsAt: slots.at(-1)?.endsAt,
+        visitDate: dto.date,
       };
     });
   }
@@ -309,36 +258,56 @@ export class CustomerService {
   }
 
   private assertChangeable(
-    appointments: { status: AppointmentStatus; timeSlot: { startsAt: Date } }[],
+    appointments: {
+      status: AppointmentStatus;
+      scheduledDate: Date | null;
+      timeSlot: { startsAt: Date } | null;
+    }[],
     action: string,
   ) {
     if (!appointments.length) throw new NotFoundException("Booking not found");
     if (appointments.some(({ status }) => !changeableStatuses.includes(status))) {
       throw new ConflictException(`This booking cannot be ${action}d`);
     }
-    if (appointments.some(({ timeSlot }) => timeSlot.startsAt <= new Date())) {
+    if (
+      appointments.some(({ scheduledDate, timeSlot }) => {
+        if (timeSlot) return timeSlot.startsAt <= new Date();
+        return !scheduledDate || scheduledDate.getTime() + 86_400_000 <= Date.now();
+      })
+    ) {
       throw new ConflictException(`Past bookings cannot be ${action}d`);
     }
   }
 
   private toBooking(id: string, appointments: BookingAppointment[], now: Date) {
     const items = [...appointments].sort(
-      (left, right) => left.timeSlot.startsAt.getTime() - right.timeSlot.startsAt.getTime(),
+      (left, right) =>
+        this.appointmentStart(left).getTime() -
+        this.appointmentStart(right).getTime(),
     );
     const first = items[0];
     const last = items.at(-1) ?? first;
     const status = first.status;
-    const isUpcoming = changeableStatuses.includes(status) && first.timeSlot.startsAt > now;
+    const dateOnly = first.timeSlot === null;
+    const startsAt = this.appointmentStart(first);
+    const endsAt = last.timeSlot?.endsAt ?? startsAt;
+    const isUpcoming =
+      changeableStatuses.includes(status) &&
+      (dateOnly
+        ? startsAt.getTime() + 86_400_000 > now.getTime()
+        : startsAt > now);
 
     return {
       id,
       status,
       isUpcoming,
-      startsAt: first.timeSlot.startsAt,
-      endsAt: last.timeSlot.endsAt,
-      durationMin: Math.round(
-        (last.timeSlot.endsAt.getTime() - first.timeSlot.startsAt.getTime()) / 60_000,
-      ),
+      dateOnly,
+      visitDate: startsAt.toISOString().slice(0, 10),
+      startsAt,
+      endsAt,
+      durationMin: dateOnly
+        ? items.length * 10
+        : Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000),
       totalPrice: items
         .reduce((total, item) => total + Number(item.service.price), 0)
         .toFixed(2),
@@ -353,6 +322,14 @@ export class CustomerService {
       canCancel: isUpcoming,
       canReschedule: isUpcoming,
     };
+  }
+
+  private appointmentStart(appointment: BookingAppointment) {
+    const startsAt = appointment.timeSlot?.startsAt ?? appointment.scheduledDate;
+    if (!startsAt) {
+      throw new ConflictException("This booking does not have a visit date");
+    }
+    return startsAt;
   }
 
   private async handleBookingTransaction<T>(

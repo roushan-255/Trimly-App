@@ -19,3 +19,6 @@ coverage/
 
 # Prisma
 backend/src/generated/prisma/
+
+# Locally uploaded development media
+backend/uploads/

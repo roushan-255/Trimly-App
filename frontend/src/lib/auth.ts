@@ -35,6 +35,8 @@ export interface CustomerSignupInput {
 export interface ShopRegistrationInput {
   name: string;
   description?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   phone?: string;
   email?: string;
   addressLine1: string;
@@ -261,4 +263,31 @@ export async function signupShopOwner(
   }
 
   return body;
+}
+
+export async function uploadShopImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', file);
+  const response = await fetch(`${API_URL}/uploads/shop-images`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body: form,
+  });
+  const body = (await response.json().catch(() => null)) as
+    | { path?: string }
+    | ErrorResponse
+    | null;
+
+  if (!response.ok) {
+    const message = body && 'message' in body ? body.message : undefined;
+    throw new AuthApiError(
+      (Array.isArray(message) ? message.join(', ') : message) ??
+        'Unable to upload this image',
+      response.status,
+    );
+  }
+  if (!body || !('path' in body) || !body.path) {
+    throw new AuthApiError('The server returned an invalid image response', 500);
+  }
+  return `${API_URL}${body.path}`;
 }

@@ -23,17 +23,6 @@ export interface PublicService {
   price: string;
 }
 
-export type SlotStatus = 'AVAILABLE' | 'BOOKED' | 'BLOCKED';
-
-export interface BarberAvailabilitySlot {
-  id: string;
-  startsAt: string;
-  endsAt: string;
-  status: SlotStatus;
-  bookable: boolean;
-  occupiedSlotIds: string[];
-}
-
 export interface BarberAvailability {
   shop: {
     id: string;
@@ -52,14 +41,14 @@ export interface BarberAvailability {
   services: PublicService[];
   selectedServiceIds: string[];
   totalDurationMin: number;
-  slots: BarberAvailabilitySlot[];
+  visitDate: string;
 }
 
 export interface CreateBookingInput {
   shopId: string;
   barberId: string;
   serviceIds: string[];
-  slotIds: string[];
+  date: string;
   notes?: string;
 }
 
@@ -67,14 +56,15 @@ export interface CreateBookingResponse {
   bookingGroupId: string;
   appointmentIds: string[];
   status: 'CONFIRMED';
-  startsAt: string;
-  endsAt: string;
+  visitDate: string;
 }
 
 export interface PublicShop {
   id: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
+  imageUrls: string[];
   phone: string | null;
   email: string | null;
   addressLine1: string;
@@ -252,7 +242,7 @@ export async function createBooking(input: CreateBookingInput) {
       },
       body: JSON.stringify({
         serviceIds: input.serviceIds,
-        slotIds: input.slotIds,
+        date: input.date,
         notes: input.notes,
       }),
       cache: 'no-store',

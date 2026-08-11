@@ -18,7 +18,18 @@ type ShopSeed = {
   postalCode: string;
   addressLine1: string;
   description: string;
+  imageUrl: string;
 };
+
+const coverImage = (photoId: number) =>
+  `https://images.pexels.com/photos/${photoId}/pexels-photo-${photoId}.jpeg?auto=compress&cs=tinysrgb&w=1200`;
+
+const galleryPhotoIds = [
+  1813272, 1570807, 3993449, 1453005, 1805600, 1319460, 897271,
+  2061820, 2076930, 3993132, 3065171, 3993134, 705255, 2521978,
+  2878373, 2881253, 3130920, 3992874, 3998429, 3998417, 3993305,
+  3993472, 3992858, 3993444, 3993320,
+];
 
 type ServiceSeed = {
   name: string;
@@ -34,6 +45,7 @@ const shops: ShopSeed[] = [
     locality: "Miyapur",
     postalCode: "500049",
     addressLine1: "Miyapur X Roads",
+    imageUrl: coverImage(1813272),
     description:
       "A neighbourhood grooming studio for clean cuts, beard styling, and quick weekday appointments.",
   },
@@ -43,6 +55,7 @@ const shops: ShopSeed[] = [
     locality: "Miyapur",
     postalCode: "500049",
     addressLine1: "Miyapur-Bollaram Road",
+    imageUrl: coverImage(1570807),
     description:
       "A relaxed local studio offering family haircuts, beard care, and restorative grooming services.",
   },
@@ -52,6 +65,7 @@ const shops: ShopSeed[] = [
     locality: "Miyapur",
     postalCode: "500049",
     addressLine1: "Madinaguda Road",
+    imageUrl: coverImage(3993449),
     description:
       "Contemporary styling and dependable everyday grooming for residents around Miyapur.",
   },
@@ -61,6 +75,7 @@ const shops: ShopSeed[] = [
     locality: "HITEC City",
     postalCode: "500081",
     addressLine1: "HITEC City Main Road",
+    imageUrl: coverImage(1453005),
     description:
       "Modern hair and beard services for professionals working around Hyderabad's technology corridor.",
   },
@@ -70,6 +85,7 @@ const shops: ShopSeed[] = [
     locality: "HITEC City",
     postalCode: "500081",
     addressLine1: "Mindspace Road",
+    imageUrl: coverImage(1805600),
     description:
       "Appointment-friendly cuts, styling, and beard services created for the working week.",
   },
@@ -79,6 +95,7 @@ const shops: ShopSeed[] = [
     locality: "HITEC City",
     postalCode: "500081",
     addressLine1: "Durgam Cheruvu Road",
+    imageUrl: coverImage(1319460),
     description:
       "Trend-aware barbers providing precision fades, textured styles, and detailed beard work.",
   },
@@ -88,6 +105,7 @@ const shops: ShopSeed[] = [
     locality: "Hafeezpet",
     postalCode: "500049",
     addressLine1: "Hafeezpet Main Road",
+    imageUrl: coverImage(897271),
     description:
       "Friendly local barbers offering classic haircuts, beard care, and family grooming services.",
   },
@@ -97,6 +115,7 @@ const shops: ShopSeed[] = [
     locality: "Hafeezpet",
     postalCode: "500049",
     addressLine1: "Hafeezpet Station Road",
+    imageUrl: coverImage(2061820),
     description:
       "Quick, practical grooming with specialists for classic cuts, beard shaping, and kids' styles.",
   },
@@ -106,6 +125,7 @@ const shops: ShopSeed[] = [
     locality: "Hafeezpet",
     postalCode: "500049",
     addressLine1: "Old Mumbai Highway",
+    imageUrl: coverImage(2076930),
     description:
       "A community barbershop balancing classic techniques with modern hair and beard styling.",
   },
@@ -115,6 +135,7 @@ const shops: ShopSeed[] = [
     locality: "Gachibowli",
     postalCode: "500032",
     addressLine1: "Gachibowli Main Road",
+    imageUrl: coverImage(3993132),
     description:
       "Contemporary cuts, beard detailing, and relaxing grooming packages in west Hyderabad.",
   },
@@ -124,6 +145,7 @@ const shops: ShopSeed[] = [
     locality: "Gachibowli",
     postalCode: "500032",
     addressLine1: "Stadium Road",
+    imageUrl: coverImage(3065171),
     description:
       "Fresh cuts, scalp care, and beard detailing from a team with varied grooming specialties.",
   },
@@ -133,6 +155,7 @@ const shops: ShopSeed[] = [
     locality: "Gachibowli",
     postalCode: "500032",
     addressLine1: "Telecom Nagar Road",
+    imageUrl: coverImage(3993134),
     description:
       "Personalised consultations, office-ready styles, and relaxed weekend grooming appointments.",
   },
@@ -142,6 +165,7 @@ const shops: ShopSeed[] = [
     locality: "Financial District",
     postalCode: "500032",
     addressLine1: "Financial District Main Road",
+    imageUrl: coverImage(705255),
     description:
       "Premium express grooming with appointment-friendly services for busy professionals.",
   },
@@ -151,6 +175,7 @@ const shops: ShopSeed[] = [
     locality: "Financial District",
     postalCode: "500032",
     addressLine1: "Nanakramguda Road",
+    imageUrl: coverImage(2521978),
     description:
       "A modern grooming lab focused on detailed consultations, precision work, and consistent results.",
   },
@@ -160,6 +185,7 @@ const shops: ShopSeed[] = [
     locality: "Financial District",
     postalCode: "500032",
     addressLine1: "ISB Road",
+    imageUrl: coverImage(2878373),
     description:
       "An elevated but approachable lounge for detailed styling, colour, beard care, and relaxation.",
   },
@@ -566,6 +592,11 @@ async function main() {
       const ownerName = ownerNames[shopIndex];
       const barberCount = 5 + (shopIndex % 4);
       const serviceCount = 5 + (shopIndex % 4);
+      const galleryImageUrls = [
+        shopSeed.imageUrl,
+        coverImage(galleryPhotoIds[(shopIndex + 15) % galleryPhotoIds.length]),
+        coverImage(galleryPhotoIds[(shopIndex + 5) % galleryPhotoIds.length]),
+      ];
 
       await prisma.user.create({
         data: {
@@ -597,6 +628,8 @@ async function main() {
           ownerId: ownerProfileId,
           name: shopSeed.name,
           description: shopSeed.description,
+          imageUrl: shopSeed.imageUrl,
+          imageUrls: galleryImageUrls,
           email: `${shopSeed.key}@shops.trimly.example`,
           addressLine1: shopSeed.addressLine1,
           addressLine2: null,
@@ -611,6 +644,8 @@ async function main() {
           ownerId: ownerProfileId,
           name: shopSeed.name,
           description: shopSeed.description,
+          imageUrl: shopSeed.imageUrl,
+          imageUrls: galleryImageUrls,
           email: `${shopSeed.key}@shops.trimly.example`,
           addressLine1: shopSeed.addressLine1,
           locality: shopSeed.locality,

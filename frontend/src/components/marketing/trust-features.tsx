@@ -8,7 +8,7 @@ const features = [
 ];
 
 export function TrustFeatures() {
-  return <section id="how-it-works" className="scroll-mt-24 bg-stone-50 py-28 sm:py-32">
+  return <section id="how-it-works" className="scroll-mt-24 bg-stone-50 py-20 sm:py-24">
     <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
       <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
         {features.map(({ icon: Icon, title, description }) => <article key={title} className="flex items-start gap-4 lg:flex-col lg:items-center lg:text-center">

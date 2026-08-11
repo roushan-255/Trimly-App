@@ -1,22 +1,16 @@
 import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  IsArray,
+  IsDateString,
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
 } from "class-validator";
 
 export class RescheduleBookingDto {
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(10)
-  @IsUUID(undefined, { each: true })
-  slotIds!: string[];
+  @IsDateString({ strict: true })
+  date!: string;
 }
 
 export class SubmitBookingReviewDto {

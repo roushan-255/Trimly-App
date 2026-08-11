@@ -11,6 +11,8 @@ export interface CustomerBooking {
   id: string;
   status: AppointmentStatus;
   isUpcoming: boolean;
+  dateOnly: boolean;
+  visitDate: string;
   startsAt: string;
   endsAt: string;
   durationMin: number;
@@ -101,15 +103,14 @@ export function cancelCustomerBooking(bookingGroupId: string) {
   );
 }
 
-export function rescheduleCustomerBooking(bookingGroupId: string, slotIds: string[]) {
+export function rescheduleCustomerBooking(bookingGroupId: string, date: string) {
   return customerRequest<{
     bookingGroupId: string;
     status: AppointmentStatus;
-    startsAt: string;
-    endsAt: string;
+    visitDate: string;
   }>(`/customer/bookings/${bookingGroupId}/reschedule`, {
     method: 'PATCH',
-    body: JSON.stringify({ slotIds }),
+    body: JSON.stringify({ date }),
   });
 }
 

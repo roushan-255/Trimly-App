@@ -123,7 +123,7 @@ function BookingsContent() {
           <p className="text-sm font-bold uppercase tracking-[.16em] text-emerald-200">Your Trimly account</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-[-.045em] sm:text-5xl">My bookings</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-            Review your appointments, choose a new time, or cancel before the appointment begins.
+            Review your planned visits, choose a new date, or cancel before the visit day.
           </p>
         </div>
       </section>
@@ -198,10 +198,12 @@ function BookingCard({ booking, confirming, cancelling, onAskCancel, onKeep, onC
 }) {
   const [review, setReview] = useState<BookingReview | null>(booking.review);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const startsAt = new Date(booking.startsAt);
+  const startsAt = booking.dateOnly
+    ? new Date(`${booking.visitDate}T00:00:00.000Z`)
+    : new Date(booking.startsAt);
   const endsAt = new Date(booking.endsAt);
   const date = new Intl.DateTimeFormat('en-IN', {
-    timeZone: booking.shop.timezone,
+    timeZone: booking.dateOnly ? 'UTC' : booking.shop.timezone,
     weekday: 'short', day: 'numeric', month: 'long', year: 'numeric',
   }).format(startsAt);
   const time = new Intl.DateTimeFormat('en-IN', {
@@ -216,7 +218,7 @@ function BookingCard({ booking, confirming, cancelling, onAskCancel, onKeep, onC
     .filter(Boolean)
     .join(', ');
   const selection = new URLSearchParams();
-  selection.set('date', dateInputValue(startsAt, booking.shop.timezone));
+  selection.set('date', booking.visitDate);
   booking.services.forEach((service) => selection.append('serviceId', service.id));
   const barberUrl = `/shops/${booking.shop.id}/barbers/${booking.barber.id}`;
   const rescheduleUrl = `${barberUrl}?reschedule=${booking.id}&${selection.toString()}`;
@@ -227,7 +229,7 @@ function BookingCard({ booking, confirming, cancelling, onAskCancel, onKeep, onC
       <div className="grid md:grid-cols-[180px_1fr]">
         <div className="flex items-center gap-4 bg-emerald-50 p-5 md:flex-col md:items-start md:justify-center md:p-7">
           <span className="grid size-12 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm"><CalendarDays className="size-6" /></span>
-          <div><p className="font-extrabold text-slate-950">{date}</p><p className="mt-1 text-sm font-bold text-emerald-800">{time} – {endTime}</p></div>
+          <div><p className="font-extrabold text-slate-950">{date}</p><p className="mt-1 text-sm font-bold text-emerald-800">{booking.dateOnly ? 'Flexible arrival' : `${time} – ${endTime}`}</p></div>
         </div>
         <div className="p-5 sm:p-7">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -254,13 +256,13 @@ function BookingCard({ booking, confirming, cancelling, onAskCancel, onKeep, onC
                 </ul>
               </div>
             </div>
-            <p className="flex items-center gap-2"><Clock3 className="size-4 text-emerald-600" /><span><span className="block text-xs text-slate-400">Duration</span><strong className="text-slate-800">{booking.durationMin} min</strong></span></p>
+            {booking.dateOnly ? <p className="flex items-center gap-2"><CalendarDays className="size-4 text-emerald-600" /><span><span className="block text-xs text-slate-400">Arrival</span><strong className="text-slate-800">Any convenient time</strong></span></p> : <p className="flex items-center gap-2"><Clock3 className="size-4 text-emerald-600" /><span><span className="block text-xs text-slate-400">Duration</span><strong className="text-slate-800">{booking.durationMin} min</strong></span></p>}
             <p className="flex items-center gap-2"><span className="text-lg font-extrabold text-emerald-600">₹</span><span><span className="block text-xs text-slate-400">Total price</span><strong className="text-slate-800">₹{formatPrice(booking.totalPrice)}</strong></span></p>
           </div>
 
           {confirming ? (
             <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-semibold text-rose-800">Cancel this complete booking and release its time slots?</p>
+              <p className="text-sm font-semibold text-rose-800">Cancel this complete visit notice?</p>
               <div className="flex gap-2">
                 <button type="button" disabled={cancelling} onClick={onKeep} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Keep booking</button>
                 <button type="button" disabled={cancelling} onClick={onCancel} className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{cancelling && <LoaderCircle className="size-4 animate-spin" />} Confirm cancellation</button>

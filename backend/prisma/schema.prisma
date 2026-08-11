@@ -136,6 +136,8 @@ model Shop {
   ownerId      String   @db.Uuid
   name         String
   description  String?
+  imageUrl     String?
+  imageUrls    String[] @default([])
   phone        String?
   email        String?
   addressLine1 String
@@ -262,7 +264,8 @@ model Appointment {
   shopId     String            @db.Uuid
   barberId   String            @db.Uuid
   serviceId  String            @db.Uuid
-  timeSlotId String            @db.Uuid
+  timeSlotId String?           @db.Uuid
+  scheduledDate DateTime?      @db.Date
   status     AppointmentStatus @default(PENDING)
   notes      String?
   createdAt  DateTime          @default(now())
@@ -272,7 +275,7 @@ model Appointment {
   shop     Shop            @relation(fields: [shopId], references: [id], onDelete: Restrict)
   barber   Barber          @relation(fields: [barberId], references: [id], onDelete: Restrict)
   service  Service         @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  timeSlot TimeSlot        @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
+  timeSlot TimeSlot?       @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
   review   Review?
 
   @@index([customerId, createdAt])
@@ -280,6 +283,7 @@ model Appointment {
   @@index([shopId, status])
   @@index([barberId, status])
   @@index([timeSlotId])
+  @@index([scheduledDate])
 }
 
 model Review {
