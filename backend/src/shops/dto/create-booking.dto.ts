@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  IsDateString,
   IsArray,
   IsOptional,
   IsString,
@@ -15,11 +16,8 @@ export class CreateBookingDto {
   @IsUUID(undefined, { each: true })
   serviceIds!: string[];
 
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(10)
-  @IsUUID(undefined, { each: true })
-  slotIds!: string[];
+  @IsDateString({ strict: true })
+  date!: string;
 
   @IsOptional()
   @IsString()

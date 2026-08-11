@@ -20,6 +20,7 @@ import {
   signupShopOwner,
   storeAuthSession,
 } from '@/lib/auth';
+import { ShopImageField } from '@/components/owner/shop-image-field';
 
 const steps = [
   { label: 'Your account', icon: ShieldCheck },
@@ -39,6 +40,7 @@ type OwnerForm = {
   panNumber: string;
   shopName: string;
   shopDescription: string;
+  shopImageUrls: string[];
   shopPhone: string;
   shopEmail: string;
   addressLine1: string;
@@ -62,6 +64,7 @@ const initialForm: OwnerForm = {
   panNumber: '',
   shopName: '',
   shopDescription: '',
+  shopImageUrls: [],
   shopPhone: '',
   shopEmail: '',
   addressLine1: '',
@@ -114,7 +117,7 @@ export default function OwnerRegisterPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const update = (key: keyof OwnerForm, value: string) => {
+  const update = <Key extends keyof OwnerForm>(key: Key, value: OwnerForm[Key]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
@@ -179,6 +182,10 @@ export default function OwnerRegisterPage() {
           name: form.shopName.trim(),
           ...(form.shopDescription.trim() && {
             description: form.shopDescription.trim(),
+          }),
+          ...(form.shopImageUrls.length && {
+            imageUrl: form.shopImageUrls[0],
+            imageUrls: form.shopImageUrls,
           }),
           ...(form.shopPhone.trim() && { phone: form.shopPhone.trim() }),
           ...(form.shopEmail.trim() && {
@@ -326,6 +333,9 @@ export default function OwnerRegisterPage() {
                   </div>
                   <div className="sm:col-span-2">
                     <TextAreaField label="Shop description" placeholder="Tell customers what makes your shop special…" value={form.shopDescription} onChange={(event) => update('shopDescription', event.target.value)} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <ShopImageField value={form.shopImageUrls} onChange={(value) => update('shopImageUrls', value)} />
                   </div>
                   <Field label="Shop phone" hint="(optional)" type="tel" placeholder="+91 98765 43210" value={form.shopPhone} onChange={(event) => update('shopPhone', event.target.value)} />
                   <Field label="Shop email" hint="(optional)" type="email" placeholder="hello@yourshop.com" value={form.shopEmail} onChange={(event) => update('shopEmail', event.target.value)} />

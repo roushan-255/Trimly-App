@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
 import { BarberReviewsDrawer, ShopReviewsDrawer } from '@/components/shops/shop-reviews-drawer';
 import { AuthApiError } from '@/lib/auth';
@@ -27,6 +27,8 @@ export default function ShopPage() {
   const [error, setError] = useState('');
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewedBarber, setReviewedBarber] = useState<PublicBarber | null>(null);
+  const [activeGalleryImage, setActiveGalleryImage] = useState(0);
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -59,6 +61,17 @@ export default function ShopPage() {
     shop.postalCode,
     shop.country,
   ].filter(Boolean).join(', ');
+  const galleryImages = shop.imageUrls.length
+    ? shop.imageUrls
+    : shop.imageUrl
+      ? [shop.imageUrl]
+      : [];
+
+  const showGalleryImage = (index: number) => {
+    const gallery = galleryRef.current;
+    if (!gallery) return;
+    gallery.scrollTo({ left: gallery.clientWidth * index, behavior: 'smooth' });
+  };
 
   return (
     <main className="min-h-screen bg-stone-50">
@@ -68,11 +81,33 @@ export default function ShopPage() {
           <Link href="/shops" className="text-sm font-bold text-emerald-700">← All barber shops</Link>
           <div className="mt-7 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
             <div className="relative grid h-72 place-items-center overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_20%_15%,rgba(184,231,209,.65),transparent_34%),linear-gradient(135deg,#0d2231,#1f5b58)] text-white">
-              <div className="absolute -bottom-24 -right-12 size-72 rounded-full border border-white/10 shadow-[0_0_0_60px_rgba(255,255,255,.025),0_0_0_120px_rgba(255,255,255,.018)]" />
-              <div className="relative text-center">
-                <span className="mx-auto grid size-20 place-items-center rounded-3xl border border-white/15 bg-white/10 text-emerald-200 backdrop-blur"><Scissors className="size-10" /></span>
-                <p className="mt-4 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-100">{shop.locality || shop.city}</p>
-              </div>
+              {galleryImages.length > 0 ? (
+                <>
+                  <div ref={galleryRef} onScroll={(event) => { const gallery = event.currentTarget; setActiveGalleryImage(Math.round(gallery.scrollLeft / gallery.clientWidth)); }} className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {galleryImages.map((image, index) => (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img key={`${image}-${index}`} src={image} alt={`${shop.name} gallery image ${index + 1}`} className="h-full min-w-full snap-center object-cover" />
+                    ))}
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/20" />
+                  <p className="pointer-events-none absolute bottom-5 left-5 text-sm font-extrabold uppercase tracking-[0.18em] text-white">{shop.locality || shop.city}</p>
+                  {galleryImages.length > 1 && (
+                    <div className="group absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950/35 px-3 py-2 backdrop-blur-sm transition-all duration-300 hover:gap-1.5 hover:bg-slate-950/50" aria-label="Shop gallery navigation">
+                      {galleryImages.map((_, index) => (
+                        <button key={index} type="button" onClick={() => showGalleryImage(index)} aria-label={`Show shop image ${index + 1}`} aria-current={activeGalleryImage === index ? 'true' : undefined} className={`h-2 w-2 rounded-full transition-all duration-300 group-hover:h-1.5 group-hover:w-8 ${activeGalleryImage === index ? 'bg-white' : 'bg-white/50 hover:bg-white/80'}`} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="absolute -bottom-24 -right-12 size-72 rounded-full border border-white/10 shadow-[0_0_0_60px_rgba(255,255,255,.025),0_0_0_120px_rgba(255,255,255,.018)]" />
+                  <div className="relative text-center">
+                    <span className="mx-auto grid size-20 place-items-center rounded-3xl border border-white/15 bg-white/10 text-emerald-200 backdrop-blur"><Scissors className="size-10" /></span>
+                    <p className="mt-4 text-sm font-extrabold uppercase tracking-[0.18em] text-emerald-100">{shop.locality || shop.city}</p>
+                  </div>
+                </>
+              )}
             </div>
             <div className="self-center">
               <div className="flex flex-wrap items-center gap-3">

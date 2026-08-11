@@ -84,7 +84,19 @@ Owner routes require a bearer token issued from a `SHOP_OWNER` login:
 
 - `GET /owner/shops`
 - `POST /owner/shops`
+- `PUT /owner/shops/:shopId` — update an owned shop's public profile
 - `POST /owner/shops/:shopId/barbers`
+- `PUT /owner/shops/:shopId/barbers/:barberId` — update a barber profile
+  and its linked login contact details
+- `DELETE /owner/shops/:shopId/barbers/:barberId` — revoke the barber's
+  membership while preserving account and appointment history
+- `POST /owner/shops/:shopId/services` — publish a new 10-minute service
+- `PUT /owner/shops/:shopId/services/:serviceId` — edit, publish, or hide a
+  service
+- `DELETE /owner/shops/:shopId/services/:serviceId` — hide a service while
+  preserving booking history
+- `GET /owner/shops/:shopId/visits` — list upcoming customer visit notices for
+  the owner dashboard
 
 Customer-facing shop discovery uses the public database-backed routes:
 
@@ -99,14 +111,18 @@ login:
 
 - `GET /customer/bookings` — upcoming and past bookings grouped by checkout
 - `PATCH /customer/bookings/:bookingGroupId/cancel` — cancel the complete
-  booking and release its slots
-- `PATCH /customer/bookings/:bookingGroupId/reschedule` — atomically reserve
-  replacement slots and release the old ones
+  booking
+- `PATCH /customer/bookings/:bookingGroupId/reschedule` — move the complete
+  booking to another visit date
 - `POST /customer/bookings/:bookingGroupId/review` — submit separate shop and
   barber ratings for a completed booking
 
 The customer booking page is available at http://localhost:3000/bookings.
 Multi-service appointments are displayed and managed as one booking.
+New bookings are date-only visit notices: customers choose a date and services,
+then notify the shop and barber that they are coming. No arrival time is
+selected or reserved. Existing timed bookings remain readable for historical
+compatibility.
 
 Owner signup creates the owner profile and first shop together. Barber accounts
 can only be added through the protected owner route, which verifies that the
@@ -115,6 +131,14 @@ for the initial MVP and must be protected or removed before production. The
 owner controller uses `BearerTokenGuard` for authentication and `RolesGuard`
 with `@Roles(UserRole.SHOP_OWNER)` for role authorization. The service also
 checks shop ownership before operating on a specific shop.
+
+Owners can manage a gallery of up to 10 public shop images during registration
+or from the shop profile editor. They can upload JPG, PNG, or WebP files up to
+5 MB each, paste image URLs, remove images, and choose the cover image. Local
+development stores these files in the ignored `backend/uploads/shop-images`
+directory and serves them from `/uploads/shop-images/:fileName`. Configure an
+object-storage provider such as Cloudinary or S3 before production deployment,
+where application filesystems may be temporary.
 
 ## Commands
 

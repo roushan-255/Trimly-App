@@ -27,6 +27,8 @@ const publicShopSelect = {
   id: true,
   name: true,
   description: true,
+  imageUrl: true,
+  imageUrls: true,
   phone: true,
   email: true,
   addressLine1: true,
@@ -45,7 +47,6 @@ const publicShopSelect = {
   barberMemberships: {
     where: {
       status: BarberMembershipStatus.ACTIVE,
-      barber: { isDiscoverable: true },
     },
     orderBy: { createdAt: "asc" as const },
     select: {
@@ -252,7 +253,6 @@ export class ShopsService {
         shopId,
         barberId,
         status: BarberMembershipStatus.ACTIVE,
-        barber: { isDiscoverable: true },
       },
       select: {
         barber: {
@@ -312,7 +312,6 @@ export class ShopsService {
         shopId,
         barberId,
         status: BarberMembershipStatus.ACTIVE,
-        barber: { isDiscoverable: true },
       },
       select: {
         barber: {
@@ -393,28 +392,7 @@ export class ShopsService {
       );
     }
 
-    const { start, end } = this.zonedDateRange(
-      query.date,
-      membership.shop.timezone,
-    );
-    const slots = await this.prisma.timeSlot.findMany({
-      where: {
-        barberId,
-        startsAt: { gte: start, lt: end },
-      },
-      orderBy: { startsAt: "asc" },
-      select: {
-        id: true,
-        startsAt: true,
-        endsAt: true,
-        status: true,
-      },
-    });
-    const now = new Date();
     const totalDurationMin = selectedServices.length * 10;
-    const bookableSlotGroups = totalDurationMin
-      ? this.bookableSlotGroups(slots, totalDurationMin, now)
-      : new Map<string, string[]>();
     const reviews = membership.barber.reviews;
     const rating = reviews.length
       ? Number(
@@ -443,18 +421,7 @@ export class ShopsService {
       services,
       selectedServiceIds: selectedServices.map((service) => service.id),
       totalDurationMin,
-      slots: slots
-        .filter(
-          (slot) =>
-            (slot.status === TimeSlotStatus.AVAILABLE ||
-              slot.status === TimeSlotStatus.BOOKED) &&
-            slot.startsAt > now,
-        )
-        .map((slot) => ({
-          ...slot,
-          bookable: bookableSlotGroups.has(slot.id),
-          occupiedSlotIds: bookableSlotGroups.get(slot.id) ?? [],
-        })),
+      visitDate: query.date,
     };
   }
 
@@ -466,24 +433,15 @@ export class ShopsService {
   ) {
     const bookingGroupId = randomUUID();
     const serviceIds = [...new Set(dto.serviceIds)];
-    const slotIds = [...new Set(dto.slotIds)];
 
-    if (
-      serviceIds.length !== dto.serviceIds.length ||
-      slotIds.length !== dto.slotIds.length
-    ) {
-      throw new BadRequestException("Services and slots cannot be duplicated");
-    }
-    if (serviceIds.length !== slotIds.length) {
-      throw new BadRequestException(
-        "Each 10-minute service requires one 10-minute slot",
-      );
+    if (serviceIds.length !== dto.serviceIds.length) {
+      throw new BadRequestException("Services cannot be duplicated");
     }
 
     try {
       return await this.prisma.$transaction(
         async (transaction) => {
-          const [customer, membership, services, slots] = await Promise.all([
+          const [customer, membership, services] = await Promise.all([
             transaction.customerProfile.findUnique({
               where: { userId: user.id },
               select: { id: true },
@@ -494,7 +452,10 @@ export class ShopsService {
                 barberId,
                 status: BarberMembershipStatus.ACTIVE,
               },
-              select: { id: true },
+              select: {
+                id: true,
+                shop: { select: { timezone: true } },
+              },
             }),
             transaction.service.findMany({
               where: {
@@ -503,16 +464,6 @@ export class ShopsService {
                 isActive: true,
               },
               select: { id: true },
-            }),
-            transaction.timeSlot.findMany({
-              where: { id: { in: slotIds }, barberId },
-              orderBy: { startsAt: "asc" },
-              select: {
-                id: true,
-                startsAt: true,
-                endsAt: true,
-                status: true,
-              },
             }),
           ]);
 
@@ -523,55 +474,23 @@ export class ShopsService {
           if (services.length !== serviceIds.length) {
             throw new NotFoundException("One or more services are not available");
           }
-          if (slots.length !== slotIds.length) {
-            throw new ConflictException("One or more slots are no longer available");
+          const { end } = this.zonedDateRange(
+            dto.date,
+            membership.shop.timezone,
+          );
+          if (end <= new Date()) {
+            throw new BadRequestException("Choose today or a future date");
           }
+          const scheduledDate = new Date(`${dto.date}T00:00:00.000Z`);
 
-          const now = new Date();
-          for (let index = 0; index < slots.length; index += 1) {
-            const slot = slots[index];
-            if (
-              slot.status !== TimeSlotStatus.AVAILABLE ||
-              slot.startsAt <= now
-            ) {
-              throw new ConflictException(
-                "One or more slots are no longer available",
-              );
-            }
-            if (slot.endsAt.getTime() - slot.startsAt.getTime() !== 600_000) {
-              throw new ConflictException("Selected slots are not 10-minute slots");
-            }
-            if (
-              index > 0 &&
-              slot.startsAt.getTime() !== slots[index - 1].endsAt.getTime()
-            ) {
-              throw new ConflictException("Selected slots are not consecutive");
-            }
-          }
-
-          const reserved = await transaction.timeSlot.updateMany({
-            where: {
-              id: { in: slotIds },
-              barberId,
-              status: TimeSlotStatus.AVAILABLE,
-              startsAt: { gt: now },
-            },
-            data: { status: TimeSlotStatus.BOOKED },
-          });
-          if (reserved.count !== slotIds.length) {
-            throw new ConflictException(
-              "These slots were just booked by another customer",
-            );
-          }
-
-          const appointments = slots.map((slot, index) => ({
+          const appointments = serviceIds.map((serviceId) => ({
             id: randomUUID(),
             bookingGroupId,
             customerId: customer.id,
             shopId,
             barberId,
-            serviceId: serviceIds[index],
-            timeSlotId: slot.id,
+            serviceId,
+            scheduledDate,
             status: AppointmentStatus.CONFIRMED,
             notes: dto.notes?.trim() || null,
           }));
@@ -581,8 +500,7 @@ export class ShopsService {
             bookingGroupId,
             appointmentIds: appointments.map((appointment) => appointment.id),
             status: AppointmentStatus.CONFIRMED,
-            startsAt: slots[0].startsAt,
-            endsAt: slots.at(-1)?.endsAt,
+            visitDate: dto.date,
           };
         },
         {
@@ -604,60 +522,10 @@ export class ShopsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         ["P2002", "P2034"].includes(error.code)
       ) {
-        throw new ConflictException(
-          "These slots were just booked by another customer",
-        );
+        throw new ConflictException("The visit could not be recorded. Try again");
       }
       throw error;
     }
-  }
-
-  private bookableSlotGroups(
-    slots: {
-      id: string;
-      startsAt: Date;
-      endsAt: Date;
-      status: TimeSlotStatus;
-    }[],
-    durationMin: number,
-    now: Date,
-  ) {
-    const bookable = new Map<string, string[]>();
-
-    for (let index = 0; index < slots.length; index += 1) {
-      const first = slots[index];
-      if (
-        first.status !== TimeSlotStatus.AVAILABLE ||
-        first.startsAt <= now
-      ) {
-        continue;
-      }
-
-      const requiredEnd = first.startsAt.getTime() + durationMin * 60_000;
-      let coverageEnd = first.startsAt.getTime();
-      let cursor = index;
-      const occupiedSlotIds: string[] = [];
-
-      while (coverageEnd < requiredEnd && cursor < slots.length) {
-        const next = slots[cursor];
-        if (
-          next.status !== TimeSlotStatus.AVAILABLE ||
-          next.startsAt.getTime() !== coverageEnd
-        ) {
-          break;
-        }
-        if (next.endsAt <= next.startsAt) break;
-        occupiedSlotIds.push(next.id);
-        coverageEnd = next.endsAt.getTime();
-        cursor += 1;
-      }
-
-      if (coverageEnd >= requiredEnd) {
-        bookable.set(first.id, occupiedSlotIds);
-      }
-    }
-
-    return bookable;
   }
 
   private zonedDateRange(date: string, timezone: string) {
@@ -771,7 +639,6 @@ export class ShopsService {
           some: {
             status: BarberMembershipStatus.ACTIVE,
             barber: {
-              isDiscoverable: true,
               timeSlots: {
                 some: {
                   status: TimeSlotStatus.AVAILABLE,
@@ -869,6 +736,8 @@ export class ShopsService {
       id: shop.id,
       name: shop.name,
       description: shop.description,
+      imageUrl: shop.imageUrl,
+      imageUrls: shop.imageUrls,
       phone: shop.phone,
       email: shop.email,
       addressLine1: shop.addressLine1,

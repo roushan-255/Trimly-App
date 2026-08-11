@@ -3,8 +3,11 @@ import { ShopSearchForm } from './shop-search-form';
 
 export function HeroSection() {
   return (
-    <section className="relative bg-white pb-28 pt-12 sm:pt-16 lg:pb-36 lg:pt-20">
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16 lg:px-10">
+    <section className="bg-white pb-20 pt-6 sm:pt-8 lg:pb-24 lg:pt-10">
+      <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <ShopSearchForm />
+      </div>
+      <div className="mx-auto mt-12 grid max-w-7xl items-center gap-12 px-5 sm:mt-16 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:gap-16 lg:px-10">
         <div className="max-w-2xl">
           <p className="mb-5 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.16em] text-emerald-700"><span className="size-2 rounded-full bg-emerald-500" /> Better barbering begins here</p>
           <h1 className="text-balance text-5xl font-extrabold tracking-[-0.06em] text-slate-950 sm:text-6xl lg:text-7xl lg:leading-[0.98]">Find the Right Barber, Not Just the Nearest Shop.</h1>
@@ -23,7 +26,6 @@ export function HeroSection() {
           </div>
         </div>
       </div>
-      <div className="absolute inset-x-0 -bottom-20 z-10 mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10"><ShopSearchForm /></div>
     </section>
   );
 }

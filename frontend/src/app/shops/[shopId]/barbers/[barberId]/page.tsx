@@ -3,7 +3,6 @@
 import {
   CalendarDays,
   Check,
-  Clock3,
   LoaderCircle,
   Scissors,
   Star,
@@ -17,7 +16,6 @@ import { AuthApiError } from '@/lib/auth';
 import { rescheduleCustomerBooking } from '@/lib/customer';
 import {
   BarberAvailability,
-  BarberAvailabilitySlot,
   getBarberAvailability,
 } from '@/lib/shops';
 
@@ -34,15 +32,6 @@ function dateInTimezone(timeZone?: string) {
       .map((part) => [part.type, part.value]),
   );
   return `${values.year}-${values.month}-${values.day}`;
-}
-
-function formatTime(slot: BarberAvailabilitySlot, timezone: string) {
-  return new Intl.DateTimeFormat('en-IN', {
-    timeZone: timezone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(slot.startsAt));
 }
 
 function formatDate(date: string) {
@@ -71,8 +60,6 @@ export default function BarberAvailabilityPage() {
   );
   const [availability, setAvailability] =
     useState<BarberAvailability | null>(null);
-  const [selectedSlot, setSelectedSlot] =
-    useState<BarberAvailabilitySlot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -83,7 +70,6 @@ export default function BarberAvailabilityPage() {
     let active = true;
     setLoading(true);
     setError('');
-    setSelectedSlot(null);
 
     getBarberAvailability(
       shopId,
@@ -126,18 +112,14 @@ export default function BarberAvailabilityPage() {
     (total, service) => total + Number(service.price),
     0,
   );
-  const bookableSlots =
-    availability?.slots.filter((slot) => slot.bookable) ?? [];
-  const nextAvailableSlot = bookableSlots[0];
   const shopToday = dateInTimezone(availability?.shop.timezone);
-  const slotsLeftToday = date === shopToday ? bookableSlots.length : null;
 
   useEffect(() => {
     if (availability && date < shopToday) setDate(shopToday);
   }, [availability, date, shopToday]);
 
   async function continueBooking() {
-    if (!availability || !selectedSlot || selectedServices.length === 0) {
+    if (!availability || selectedServices.length === 0) {
       return;
     }
 
@@ -145,10 +127,7 @@ export default function BarberAvailabilityPage() {
       setIsSubmitting(true);
       setActionError('');
       try {
-        await rescheduleCustomerBooking(
-          rescheduleId,
-          selectedSlot.occupiedSlotIds,
-        );
+        await rescheduleCustomerBooking(rescheduleId, date);
         router.push('/bookings?rescheduled=1');
       } catch (caught: unknown) {
         if (caught instanceof AuthApiError && caught.status === 401) {
@@ -174,15 +153,10 @@ export default function BarberAvailabilityPage() {
       service: selectedServices.map((service) => service.name).join(' + '),
       date,
       dateLabel: formatDate(date),
-      time: formatTime(selectedSlot, availability.shop.timezone),
-      duration: String(availability.totalDurationMin),
       price: String(totalPrice),
     });
     selectedServices.forEach((service) =>
       params.append('serviceId', service.id),
-    );
-    selectedSlot.occupiedSlotIds.forEach((slotId) =>
-      params.append('slotId', slotId),
     );
     router.push(`/checkout?${params.toString()}`);
   }
@@ -294,7 +268,7 @@ export default function BarberAvailabilityPage() {
 
         {rescheduleId && (
           <p className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm font-bold text-blue-800">
-            Choose a new date and time. Your original appointment remains reserved until the change succeeds.
+            Choose a new visit date. Your original booking remains unchanged until the update succeeds.
           </p>
         )}
 
@@ -303,10 +277,10 @@ export default function BarberAvailabilityPage() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-950">
-                  Choose a time
+                  Choose your visit date
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Times are shown in {shop.timezone}.
+                  No arrival time is required. This lets the shop and barber know you plan to visit that day.
                 </p>
               </div>
               <label className="text-sm font-bold text-slate-700">
@@ -327,7 +301,7 @@ export default function BarberAvailabilityPage() {
                   Services
                 </legend>
                 <p className="mt-1 text-xs text-slate-500">
-                  Select one or more. Each service adds 10 minutes.
+                  Select one or more services for your visit.
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   {availability.services.map((service) => (
@@ -348,7 +322,7 @@ export default function BarberAvailabilityPage() {
                           {service.name}
                         </span>
                         <span className="mt-1 block text-xs font-semibold text-slate-500">
-                          10 min · ₹{service.price}
+                          ₹{service.price}
                         </span>
                       </span>
                       <span
@@ -370,61 +344,10 @@ export default function BarberAvailabilityPage() {
               </p>
             )}
 
-            <div className="mt-7 flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-950">
-                Appointment slots
-              </h3>
-              {loading && (
-                <LoaderCircle className="size-4 animate-spin text-emerald-600" />
-              )}
-            </div>
-
-            {availability.slots.length === 0 ? (
-              <p className="mt-4 rounded-2xl bg-slate-50 p-5 text-sm text-slate-500">
-                No slots are published for this date.
-              </p>
-            ) : (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {availability.slots.map((slot) => {
-                  const selectedIndex =
-                    selectedSlot?.occupiedSlotIds.indexOf(slot.id) ?? -1;
-                  const selected = selectedIndex >= 0;
-                  const enabled = slot.bookable && !loading;
-                  const slotLabel = selected
-                    ? `Service ${selectedIndex + 1} of ${selectedServices.length}`
-                    : slot.status === 'BOOKED'
-                      ? 'Booked'
-                      : slot.bookable
-                        ? `${availability.totalDurationMin} min available`
-                        : 'Available';
-
-                  return (
-                    <button
-                      key={slot.id}
-                      type="button"
-                      disabled={!enabled}
-                      onClick={() => setSelectedSlot(slot)}
-                      className={`rounded-xl border px-3 py-3 text-sm font-extrabold transition ${
-                        selected
-                          ? 'border-emerald-700 bg-emerald-600 text-white ring-2 ring-emerald-200'
-                          : slot.status === 'BOOKED'
-                            ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500'
-                          : enabled
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100'
-                            : 'cursor-not-allowed border-emerald-100 bg-emerald-50 text-emerald-700 opacity-60'
-                      }`}
-                    >
-                      <span className="block">
-                        {formatTime(slot, shop.timezone)}
-                      </span>
-                      <span className="mt-1 block text-[10px] uppercase tracking-wide">
-                        {slotLabel}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <p className="mt-7 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-sm leading-6 text-emerald-900">
+              <CalendarDays className="mt-0.5 size-5 shrink-0" />
+              Your booking is a visit notice for <strong>{formatDate(date)}</strong>. The shop and barber will know you are coming; you can arrive at a convenient time during their business hours.
+            </p>
           </section>
 
           <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
@@ -452,7 +375,7 @@ export default function BarberAvailabilityPage() {
                 <p className="mt-3 border-t border-slate-100 pt-3 text-sm font-bold text-slate-600">
                   {selectedServices.length} service
                   {selectedServices.length === 1 ? '' : 's'} ·{' '}
-                  {availability.totalDurationMin} min · ₹{totalPrice}
+                  ₹{totalPrice}
                 </p>
               </div>
             ) : (
@@ -460,30 +383,20 @@ export default function BarberAvailabilityPage() {
                 Choose at least one service.
               </p>
             )}
-            {nextAvailableSlot && (
-              <p className="mt-5 flex gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
-                <Clock3 className="size-4 shrink-0" />
-                Next available slot:{' '}
-                {formatTime(nextAvailableSlot, shop.timezone)}
-              </p>
-            )}
-            {slotsLeftToday !== null && (
-              <p className="mt-3 flex gap-2 text-sm font-bold text-slate-600">
-                <CalendarDays className="size-4 text-emerald-600" />
-                {slotsLeftToday} slots left today
-              </p>
-            )}
+            <p className="mt-5 flex gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
+              <CalendarDays className="size-4 shrink-0" /> {formatDate(date)} · Flexible arrival
+            </p>
             <button
               type="button"
-              disabled={!selectedSlot || selectedServices.length === 0 || isSubmitting}
+              disabled={selectedServices.length === 0 || isSubmitting}
               onClick={() => void continueBooking()}
               className="mt-7 w-full rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isSubmitting
                 ? 'Rescheduling…'
                 : rescheduleId
-                  ? 'Confirm new time'
-                  : 'Continue booking'}
+                  ? 'Confirm new date'
+                  : 'Book visit'}
             </button>
             {actionError && (
               <p role="alert" className="mt-3 text-center text-xs font-semibold text-rose-600">
@@ -492,8 +405,8 @@ export default function BarberAvailabilityPage() {
             )}
             <p className="mt-3 text-center text-xs leading-5 text-slate-500">
               {rescheduleId
-                ? 'Your old time is released only after this change is confirmed.'
-                : 'No login is needed to choose a time.'}
+                ? 'Your old date changes only after this update is confirmed.'
+                : 'This sends a visit notice to the shop and barber.'}
             </p>
           </aside>
         </div>

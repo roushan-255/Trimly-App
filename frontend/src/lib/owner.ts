@@ -13,20 +13,44 @@ export interface OwnerBarber {
   user: { email: string; phone: string | null } | null;
 }
 
+export interface OwnerService {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMin: number;
+  price: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface OwnerVisit {
+  id: string;
+  visitDate: string;
+  status: 'PENDING' | 'CONFIRMED';
+  createdAt: string;
+  customerName: string;
+  barber: { id: string; displayName: string };
+  services: { id: string; name: string }[];
+}
+
 export interface OwnerShop {
   id: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
+  imageUrls: string[];
   phone: string | null;
   email: string | null;
   addressLine1: string;
   addressLine2: string | null;
+  locality: string | null;
   city: string;
   state: string | null;
   postalCode: string;
   country: string;
   createdAt: string;
   barbers: OwnerBarber[];
+  services: OwnerService[];
 }
 
 interface ApiError {
@@ -69,6 +93,10 @@ export function getOwnerShops() {
   return ownerRequest<OwnerShop[]>('/owner/shops');
 }
 
+export function getOwnerVisits(shopId: string) {
+  return ownerRequest<OwnerVisit[]>(`/owner/shops/${shopId}/visits`);
+}
+
 export function addShopBarber(
   shopId: string,
   barber: {
@@ -83,4 +111,84 @@ export function addShopBarber(
     method: 'POST',
     body: JSON.stringify(barber),
   });
+}
+
+export type OwnerShopInput = {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  phone?: string;
+  email?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  locality?: string;
+  city: string;
+  state?: string;
+  postalCode: string;
+  country: string;
+};
+
+export function updateOwnerShop(shopId: string, shop: OwnerShopInput) {
+  return ownerRequest<OwnerShop>(`/owner/shops/${shopId}`, {
+    method: 'PUT',
+    body: JSON.stringify(shop),
+  });
+}
+
+export function updateShopBarber(
+  shopId: string,
+  barberId: string,
+  barber: {
+    displayName: string;
+    email?: string;
+    phone?: string | null;
+    bio?: string | null;
+  },
+) {
+  return ownerRequest<OwnerBarber>(
+    `/owner/shops/${shopId}/barbers/${barberId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(barber),
+    },
+  );
+}
+
+export function removeShopBarber(shopId: string, barberId: string) {
+  return ownerRequest<{ barberId: string; status: 'REVOKED' }>(
+    `/owner/shops/${shopId}/barbers/${barberId}`,
+    { method: 'DELETE' },
+  );
+}
+
+export type OwnerServiceInput = {
+  name: string;
+  description?: string | null;
+  price: number;
+};
+
+export function addShopService(shopId: string, service: OwnerServiceInput) {
+  return ownerRequest<OwnerService>(`/owner/shops/${shopId}/services`, {
+    method: 'POST',
+    body: JSON.stringify(service),
+  });
+}
+
+export function updateShopService(
+  shopId: string,
+  serviceId: string,
+  service: OwnerServiceInput & { isActive: boolean },
+) {
+  return ownerRequest<OwnerService>(
+    `/owner/shops/${shopId}/services/${serviceId}`,
+    { method: 'PUT', body: JSON.stringify(service) },
+  );
+}
+
+export function deactivateShopService(shopId: string, serviceId: string) {
+  return ownerRequest<OwnerService>(
+    `/owner/shops/${shopId}/services/${serviceId}`,
+    { method: 'DELETE' },
+  );
 }
