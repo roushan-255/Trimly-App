@@ -17,6 +17,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Navbar } from '@/components/marketing/navbar';
 import { BarberReviewsDrawer, ShopReviewsDrawer } from '@/components/shops/shop-reviews-drawer';
+import { ShopServicesDrawer } from '@/components/shops/shop-services-drawer';
 import { AuthApiError } from '@/lib/auth';
 import { PublicBarber, PublicShop, getPublicShop } from '@/lib/shops';
 
@@ -26,6 +27,7 @@ export default function ShopPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
   const [reviewedBarber, setReviewedBarber] = useState<PublicBarber | null>(null);
   const [activeGalleryImage, setActiveGalleryImage] = useState(0);
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -115,8 +117,15 @@ export default function ShopPage() {
                 {shop.verified && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700"><BadgeCheck className="size-4" /> Verified</span>}
               </div>
               <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl">{shop.name}</h1>
+              <p className="mt-4 max-w-2xl leading-7 text-slate-600">
+                {shop.description || 'This shop has recently joined Trimly. More information will be added by the owner soon.'}
+              </p>
               <p className="mt-4 flex items-start gap-2 leading-6 text-slate-600"><MapPin className="mt-1 size-4 shrink-0 text-emerald-600" /> {address}</p>
-              <div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-slate-600">
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-sm font-semibold text-slate-600">
+                {shop.phone && <a href={`tel:${shop.phone}`} className="flex items-center gap-2 transition hover:text-emerald-700"><Phone className="size-4 text-emerald-600" /> {shop.phone}</a>}
+                {shop.email && <a href={`mailto:${shop.email}`} className="flex items-center gap-2 transition hover:text-emerald-700"><Mail className="size-4 text-emerald-600" /> {shop.email}</a>}
+              </div>
+              <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold text-slate-600">
                 <span className="flex items-center gap-1"><Users className="size-4 text-emerald-600" /> {shop.barberCount} {shop.barberCount === 1 ? 'barber' : 'barbers'}</span>
                 <span className="flex items-center gap-1"><Scissors className="size-4 text-emerald-600" /> {shop.serviceCount} {shop.serviceCount === 1 ? 'service' : 'services'}</span>
               </div>
@@ -126,24 +135,7 @@ export default function ShopPage() {
       </section>
 
       <section className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 lg:grid-cols-[1fr_.72fr] lg:px-10">
-        <div className="space-y-10">
-          <article>
-            <p className="text-sm font-bold uppercase tracking-[0.14em] text-emerald-700">About the shop</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-slate-950">A closer look at {shop.name}</h2>
-            <p className="mt-4 max-w-3xl leading-7 text-slate-600">{shop.description || 'This shop has recently joined Trimly. More information will be added by the owner soon.'}</p>
-          </article>
-
-          <article>
-            <h2 className="text-2xl font-extrabold text-slate-950">Services</h2>
-            {shop.services.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-7 text-sm text-slate-500">The owner has not published services yet.</div>
-            ) : (
-              <div className="mt-4 grid gap-3">
-                {shop.services.map((service) => <div key={service.id} className="flex items-center justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div><h3 className="font-extrabold">{service.name}</h3><p className="mt-1 text-sm text-slate-500">{service.description || `${service.durationMin} minute appointment`}</p><p className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-400"><Clock3 className="size-3.5" /> {service.durationMin} min</p></div><strong className="text-lg text-emerald-700">₹{service.price}</strong></div>)}
-              </div>
-            )}
-          </article>
-
+        <div>
           <article>
             <h2 className="text-2xl font-extrabold text-slate-950">Meet the team</h2>
             {shop.barbers.length === 0 ? (
@@ -157,15 +149,34 @@ export default function ShopPage() {
         </div>
 
         <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
-          <h2 className="text-lg font-extrabold text-slate-950">Contact & location</h2>
-          <div className="mt-5 space-y-4 text-sm leading-6 text-slate-600">
-            <p className="flex items-start gap-3"><MapPin className="mt-1 size-4 shrink-0 text-emerald-600" /> {address}</p>
-            {shop.phone && <a href={`tel:${shop.phone}`} className="flex items-center gap-3 hover:text-emerald-700"><Phone className="size-4 text-emerald-600" /> {shop.phone}</a>}
-            {shop.email && <a href={`mailto:${shop.email}`} className="flex items-center gap-3 hover:text-emerald-700"><Mail className="size-4 text-emerald-600" /> {shop.email}</a>}
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-extrabold uppercase tracking-[.14em] text-emerald-700">Service menu</p>
+              <h2 className="mt-1 text-2xl font-extrabold text-slate-950">Popular services</h2>
+            </div>
+            {shop.services.length > 0 && <span className="shrink-0 text-xs font-bold text-slate-400">{shop.services.length} total</span>}
           </div>
-          <div className="mt-6 rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
-            Online booking will become available when the owner publishes services and appointment slots.
-          </div>
+          {shop.services.length === 0 ? (
+            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-stone-50 p-6 text-sm text-slate-500">The owner has not published services yet.</div>
+          ) : (
+            <div className="mt-5 space-y-3">
+              {shop.services.slice(0, 3).map((service) => (
+                <article key={service.id} className="rounded-2xl bg-stone-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-slate-950">{service.name}</h3>
+                      <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{service.description || `${service.durationMin} minute service`}</p>
+                    </div>
+                    <strong className="shrink-0 text-emerald-700">₹{service.price}</strong>
+                  </div>
+                  <p className="mt-2 flex items-center gap-1 text-xs font-bold text-slate-400"><Clock3 className="size-3.5" /> {service.durationMin} min</p>
+                </article>
+              ))}
+              <button type="button" onClick={() => setServicesOpen(true)} className="mt-2 flex w-full items-center justify-center rounded-xl border border-emerald-600 px-4 py-3 text-sm font-extrabold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-100">
+                View all services
+              </button>
+            </div>
+          )}
         </aside>
       </section>
       {shop.rating !== null && (
@@ -174,6 +185,7 @@ export default function ShopPage() {
       {reviewedBarber && reviewedBarber.rating !== null && (
         <BarberReviewsDrawer open shopId={shop.id} barberId={reviewedBarber.id} barberName={reviewedBarber.displayName} rating={reviewedBarber.rating} reviewCount={reviewedBarber.reviewCount} onClose={() => setReviewedBarber(null)} />
       )}
+      <ShopServicesDrawer open={servicesOpen} shopName={shop.name} services={shop.services} onClose={() => setServicesOpen(false)} />
     </main>
   );
 }

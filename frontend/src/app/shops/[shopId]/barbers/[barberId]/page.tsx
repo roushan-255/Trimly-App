@@ -10,6 +10,7 @@ import {
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { InlineBookingModal } from '@/components/booking/inline-booking-modal';
 import { Navbar } from '@/components/marketing/navbar';
 import { BarberReviewsDrawer } from '@/components/shops/shop-reviews-drawer';
 import { AuthApiError } from '@/lib/auth';
@@ -65,6 +66,7 @@ export default function BarberAvailabilityPage() {
   const [actionError, setActionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -145,20 +147,7 @@ export default function BarberAvailabilityPage() {
       return;
     }
 
-    const params = new URLSearchParams({
-      shopId,
-      barberId,
-      shop: availability.shop.name,
-      barber: availability.barber.displayName,
-      service: selectedServices.map((service) => service.name).join(' + '),
-      date,
-      dateLabel: formatDate(date),
-      price: String(totalPrice),
-    });
-    selectedServices.forEach((service) =>
-      params.append('serviceId', service.id),
-    );
-    router.push(`/checkout?${params.toString()}`);
+    setBookingModalOpen(true);
   }
 
   function toggleService(serviceId: string) {
@@ -414,6 +403,21 @@ export default function BarberAvailabilityPage() {
       {barber.rating !== null && (
         <BarberReviewsDrawer open={reviewsOpen} shopId={shopId} barberId={barber.id} barberName={barber.displayName} rating={barber.rating} reviewCount={barber.reviewCount} onClose={() => setReviewsOpen(false)} />
       )}
+      <InlineBookingModal
+        open={bookingModalOpen}
+        onClose={() => setBookingModalOpen(false)}
+        shopId={shopId}
+        barberId={barberId}
+        serviceIds={serviceIds}
+        date={date}
+        booking={{
+          shop: shop.name,
+          barber: barber.displayName,
+          service: selectedServices.map((service) => service.name).join(' + '),
+          date: formatDate(date),
+          price: String(totalPrice),
+        }}
+      />
     </main>
   );
 }
