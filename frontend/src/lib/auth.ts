@@ -68,7 +68,11 @@ interface ErrorResponse {
   message?: string | string[];
 }
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
+export const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL ??
+  process.env.NEXT_PUBLIC_BACKEND_URL ??
+  '/api/backend'
+).replace(/\/+$/, '');
 export const AUTH_SESSION_CHANGED_EVENT = 'trimly:auth-session-changed';
 const ACCESS_TOKEN_KEY = 'trimly.accessToken';
 const USER_KEY = 'trimly.user';
