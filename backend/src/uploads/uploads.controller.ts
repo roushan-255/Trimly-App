@@ -9,7 +9,10 @@ import {
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+// Import the interceptor implementation directly. Vercel's Node service
+// bundler does not preserve this function correctly through the package's
+// CommonJS barrel export.
+import { FileInterceptor } from "@nestjs/platform-express/multer/interceptors/file.interceptor";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { randomUUID } from "node:crypto";
