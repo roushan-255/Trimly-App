@@ -32,8 +32,12 @@ same commands without the `corepack` prefix.
 
 ## Backend environment
 
-The frontend reads its API origin from `NEXT_PUBLIC_API_URL` and defaults to
-`http://localhost:4000` in the example environment file. Before running the API:
+The frontend reads its API base URL from `NEXT_PUBLIC_API_URL`. For local
+development, the example environment points to
+`http://localhost:4000`. On Vercel, the frontend also recognizes the generated
+`NEXT_PUBLIC_BACKEND_URL` service variable and otherwise uses the same-origin
+`/api/backend` path. Nest applies that prefix only in Vercel, leaving local API
+routes unchanged. Before running the API:
 
 ```bash
 cp backend/.env.example backend/.env
@@ -43,7 +47,8 @@ corepack pnpm --dir backend exec prisma migrate deploy
 corepack pnpm --dir backend start:dev
 ```
 
-The MVP authentication routes are:
+The API routes below are relative to `NEXT_PUBLIC_API_URL`. The MVP
+authentication routes are:
 
 - `POST /auth/signup/customer`
 - `POST /auth/signup/shop-owner`
@@ -157,3 +162,10 @@ where application filesystems may be temporary.
 Set `DATABASE_URL` in `backend/.env` to the PostgreSQL connection URL you provide.
 Prisma is configured in `backend/prisma/schema.prisma` with the initial booking
 domain models. Apply the checked-in migrations before starting the backend.
+
+For Vercel deployments, add `DATABASE_URL` and `JWT_ACCESS_SECRET` in the
+project's Environment Variables settings for both Production and Preview as
+needed, then redeploy. Local `.env` files are intentionally ignored and are not
+uploaded by Git. Use the pooled connection URL supplied by a serverless
+PostgreSQL provider, and apply migrations to that production database with
+`corepack pnpm --dir backend exec prisma migrate deploy` before serving traffic.

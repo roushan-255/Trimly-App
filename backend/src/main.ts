@@ -14,6 +14,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService);
 
+  // Vercel forwards the original service path, while local development calls
+  // the API directly at localhost:4000 without a prefix.
+  if (config.get<string>("VERCEL")) {
+    app.setGlobalPrefix("api/backend");
+  }
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -27,7 +33,7 @@ async function bootstrap() {
   });
   app.enableShutdownHooks();
 
-  await app.listen(config.getOrThrow<number>("PORT"));
+  await app.listen(config.get<number>("PORT") ?? 4000);
 }
 
 void bootstrap();
