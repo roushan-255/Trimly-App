@@ -68,6 +68,20 @@ interface ErrorResponse {
   message?: string | string[];
 }
 
+interface CloudinarySignatureResponse {
+  uploadUrl: string;
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  uploadPreset: string;
+  signature: string;
+}
+
+interface CloudinaryUploadResponse {
+  secure_url?: string;
+  error?: { message?: string };
+}
+
 export const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ??
   process.env.NEXT_PUBLIC_BACKEND_URL ??
@@ -270,28 +284,68 @@ export async function signupShopOwner(
 }
 
 export async function uploadShopImage(file: File): Promise<string> {
-  const form = new FormData();
-  form.append('image', file);
-  const response = await fetch(`${API_URL}/uploads/shop-images`, {
-    method: 'POST',
-    headers: { Accept: 'application/json' },
-    body: form,
-  });
-  const body = (await response.json().catch(() => null)) as
-    | { path?: string }
+  const signatureResponse = await fetch(
+    `${API_URL}/uploads/shop-images/signature`,
+    {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    },
+  );
+  const signatureBody = (await signatureResponse.json().catch(() => null)) as
+    | CloudinarySignatureResponse
     | ErrorResponse
     | null;
 
-  if (!response.ok) {
-    const message = body && 'message' in body ? body.message : undefined;
+  if (!signatureResponse.ok) {
+    const message =
+      signatureBody && 'message' in signatureBody
+        ? signatureBody.message
+        : undefined;
     throw new AuthApiError(
       (Array.isArray(message) ? message.join(', ') : message) ??
-        'Unable to upload this image',
+        'Unable to prepare this image upload',
+      signatureResponse.status,
+    );
+  }
+
+  if (
+    !signatureBody ||
+    !('uploadUrl' in signatureBody) ||
+    typeof signatureBody.uploadUrl !== 'string'
+  ) {
+    throw new AuthApiError(
+      'The server returned an invalid upload signature',
+      signatureResponse.status,
+    );
+  }
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('api_key', signatureBody.apiKey);
+  form.append('timestamp', String(signatureBody.timestamp));
+  form.append('folder', signatureBody.folder);
+  form.append('upload_preset', signatureBody.uploadPreset);
+  form.append('signature', signatureBody.signature);
+
+  const response = await fetch(signatureBody.uploadUrl, {
+    method: 'POST',
+    body: form,
+  });
+  const body = (await response.json().catch(() => null)) as
+    | CloudinaryUploadResponse
+    | null;
+
+  if (!response.ok) {
+    throw new AuthApiError(
+      body?.error?.message ?? 'Unable to upload this image',
       response.status,
     );
   }
-  if (!body || !('path' in body) || !body.path) {
+
+  if (!body?.secure_url) {
     throw new AuthApiError('The server returned an invalid image response', 500);
   }
-  return `${API_URL}${body.path}`;
+
+  return body.secure_url;
 }

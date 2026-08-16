@@ -1,70 +1,69 @@
-import {
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  ParseFilePipeBuilder,
-  Post,
-  StreamableFile,
-  UploadedFile,
-  UseInterceptors,
-} from "@nestjs/common";
-// Import the interceptor implementation directly. Vercel's Node service
-// bundler does not preserve this function correctly through the package's
-// CommonJS barrel export.
-import { FileInterceptor } from "@nestjs/platform-express/multer/interceptors/file.interceptor";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { extname, join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { Controller, Post, ServiceUnavailableException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { createHash } from "node:crypto";
 
-type UploadedImage = {
-  buffer: Buffer;
-  mimetype: string;
-};
+const DEFAULT_CLOUDINARY_FOLDER = "trimly/shop-images";
 
-const IMAGE_DIRECTORY = join(process.cwd(), "uploads", "shop-images");
-const IMAGE_TYPES: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-};
+type SignatureParameter = string | number;
+
+export function signCloudinaryParameters(
+  parameters: Record<string, SignatureParameter>,
+  apiSecret: string,
+) {
+  const serialized = Object.entries(parameters)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  return createHash("sha1")
+    .update(`${serialized}${apiSecret}`)
+    .digest("hex");
+}
 
 @Controller("uploads")
 export class UploadsController {
-  @Post("shop-images")
-  @UseInterceptors(FileInterceptor("image"))
-  async uploadShopImage(
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({ fileType: /^image\/(jpeg|png|webp)$/ })
-        .addMaxSizeValidator({ maxSize: 5 * 1024 * 1024 })
-        .build({ fileIsRequired: true }),
-    )
-    image: UploadedImage,
-  ) {
-    await mkdir(IMAGE_DIRECTORY, { recursive: true });
-    const fileName = `${randomUUID()}${IMAGE_TYPES[image.mimetype]}`;
-    await writeFile(join(IMAGE_DIRECTORY, fileName), image.buffer, {
-      flag: "wx",
-    });
-    return { path: `/uploads/shop-images/${fileName}` };
+  constructor(private readonly config: ConfigService) {}
+
+  @Post("shop-images/signature")
+  createShopImageSignature() {
+    const cloudName = this.requiredSetting("CLOUDINARY_CLOUD_NAME");
+    const apiKey = this.requiredSetting("CLOUDINARY_API_KEY");
+    const apiSecret = this.requiredSetting("CLOUDINARY_API_SECRET");
+    const uploadPreset = this.requiredSetting("CLOUDINARY_UPLOAD_PRESET");
+    const folder =
+      this.config.get<string>("CLOUDINARY_FOLDER")?.trim() ||
+      DEFAULT_CLOUDINARY_FOLDER;
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(cloudName)) {
+      throw new ServiceUnavailableException(
+        "Cloudinary is not configured correctly",
+      );
+    }
+
+    const timestamp = Math.floor(Date.now() / 1_000);
+    const signedParameters = {
+      folder,
+      timestamp,
+      upload_preset: uploadPreset,
+    };
+
+    return {
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      apiKey,
+      timestamp,
+      folder,
+      uploadPreset,
+      signature: signCloudinaryParameters(signedParameters, apiSecret),
+    };
   }
 
-  @Get("shop-images/:fileName")
-  async shopImage(@Param("fileName") fileName: string) {
-    if (!/^[a-f0-9-]+\.(jpg|png|webp)$/.test(fileName)) {
-      throw new NotFoundException("Image not found");
+  private requiredSetting(name: string) {
+    const value = this.config.get<string>(name)?.trim();
+    if (!value) {
+      throw new ServiceUnavailableException(
+        "Cloudinary image uploads are not configured",
+      );
     }
-
-    try {
-      const extension = extname(fileName).slice(1);
-      const mimeType = extension === "jpg" ? "image/jpeg" : `image/${extension}`;
-      return new StreamableFile(await readFile(join(IMAGE_DIRECTORY, fileName)), {
-        type: mimeType,
-        disposition: `inline; filename="${fileName}"`,
-      });
-    } catch {
-      throw new NotFoundException("Image not found");
-    }
+    return value;
   }
 }

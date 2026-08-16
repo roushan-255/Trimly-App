@@ -41,7 +41,7 @@ routes unchanged. Before running the API:
 
 ```bash
 cp backend/.env.example backend/.env
-# Set DATABASE_URL, JWT_ACCESS_SECRET, and SEED_OWNER_PASSWORD in backend/.env
+# Set database, authentication, seed, and Cloudinary values in backend/.env
 corepack pnpm --dir backend prisma:generate
 corepack pnpm --dir backend exec prisma migrate deploy
 corepack pnpm --dir backend start:dev
@@ -139,12 +139,13 @@ checks shop ownership before operating on a specific shop.
 
 Owners can manage a gallery of up to 10 public shop images during registration
 or from the shop profile editor. They can upload JPG, PNG, or WebP files up to
-5 MB each, paste image URLs, remove images, and choose the cover image. Local
-development stores these files in the ignored `backend/uploads/shop-images`
-directory and serves them from `/uploads/shop-images/:fileName`. The local-file
-upload module is disabled on Vercel because its application filesystem is
-ephemeral. Pasted public image URLs continue to work; configure an object-storage
-provider such as Cloudinary or S3 before enabling file uploads in production.
+5 MB each, paste image URLs, remove images, and choose the cover image. File
+uploads go directly from the browser to Cloudinary using a short-lived signature
+created by the backend; image bytes never pass through Nest or Vercel. Create a
+signed Cloudinary upload preset named by `CLOUDINARY_UPLOAD_PRESET`, restrict it
+to JPG, PNG, and WebP images with a 5 MB maximum, and configure all five
+`CLOUDINARY_*` variables from `backend/.env.example`. Never expose
+`CLOUDINARY_API_SECRET` through a `NEXT_PUBLIC_*` variable.
 
 ## Commands
 
@@ -164,9 +165,10 @@ Set `DATABASE_URL` in `backend/.env` to the PostgreSQL connection URL you provid
 Prisma is configured in `backend/prisma/schema.prisma` with the initial booking
 domain models. Apply the checked-in migrations before starting the backend.
 
-For Vercel deployments, add `DATABASE_URL` and `JWT_ACCESS_SECRET` in the
-project's Environment Variables settings for both Production and Preview as
-needed, then redeploy. Local `.env` files are intentionally ignored and are not
-uploaded by Git. Use the pooled connection URL supplied by a serverless
-PostgreSQL provider, and apply migrations to that production database with
+For Vercel deployments, add `DATABASE_URL`, `JWT_ACCESS_SECRET`, and the five
+`CLOUDINARY_*` settings from `backend/.env.example` in the project's Environment
+Variables settings for both Production and Preview as needed, then redeploy.
+Local `.env` files are intentionally ignored and are not uploaded by Git. Use
+the pooled connection URL supplied by a serverless PostgreSQL provider, and
+apply migrations to that production database with
 `corepack pnpm --dir backend exec prisma migrate deploy` before serving traffic.

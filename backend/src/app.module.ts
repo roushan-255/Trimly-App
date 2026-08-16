@@ -5,14 +5,7 @@ import { CustomerModule } from "./customer/customer.module";
 import { OwnerModule } from "./owner/owner.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ShopsModule } from "./shops/shops.module";
-
-// The current upload implementation writes to the local filesystem. Keep it
-// available for local development, but do not load it in Vercel's ephemeral
-// runtime. Loading Nest's FileInterceptor there also triggers a Vercel CJS
-// bundling incompatibility that prevents the entire API from starting.
-const localOnlyModules = process.env.VERCEL
-  ? []
-  : [require("./uploads/uploads.module").UploadsModule];
+import { UploadsModule } from "./uploads/uploads.module";
 
 @Module({
   imports: [
@@ -25,7 +18,7 @@ const localOnlyModules = process.env.VERCEL
     CustomerModule,
     OwnerModule,
     ShopsModule,
-    ...localOnlyModules,
+    UploadsModule,
   ],
 })
 export class AppModule {}
