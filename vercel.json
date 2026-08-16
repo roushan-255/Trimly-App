@@ -5,7 +5,7 @@
             "framework": "nextjs"
         },
         "backend": {
-            "root": "backend"
+            "root": "src/main.ts"
         }
     },
     "rewrites": [
