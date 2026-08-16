@@ -141,9 +141,10 @@ Owners can manage a gallery of up to 10 public shop images during registration
 or from the shop profile editor. They can upload JPG, PNG, or WebP files up to
 5 MB each, paste image URLs, remove images, and choose the cover image. Local
 development stores these files in the ignored `backend/uploads/shop-images`
-directory and serves them from `/uploads/shop-images/:fileName`. Configure an
-object-storage provider such as Cloudinary or S3 before production deployment,
-where application filesystems may be temporary.
+directory and serves them from `/uploads/shop-images/:fileName`. The local-file
+upload module is disabled on Vercel because its application filesystem is
+ephemeral. Pasted public image URLs continue to work; configure an object-storage
+provider such as Cloudinary or S3 before enabling file uploads in production.
 
 ## Commands
 
