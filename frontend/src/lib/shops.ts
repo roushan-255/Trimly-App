@@ -62,6 +62,9 @@ export interface CreateBookingResponse {
 export interface PublicShop {
   id: string;
   name: string;
+  brandId: string | null;
+  brandName: string;
+  branchName: string | null;
   description: string | null;
   imageUrl: string | null;
   imageUrls: string[];

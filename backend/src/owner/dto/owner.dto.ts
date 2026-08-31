@@ -60,6 +60,12 @@ export class CreateShopDto {
   @Transform(optionalTrim)
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  branchName?: string;
+
+  @Transform(optionalTrim)
+  @IsOptional()
+  @IsString()
   @MaxLength(2_000)
   description?: string;
 
@@ -127,6 +133,19 @@ export class CreateShopDto {
   @MinLength(2)
   @MaxLength(100)
   country!: string;
+}
+
+export class CreateBranchDto extends CreateShopDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  declare branchName: string;
+
+  @Type(() => Boolean)
+  @IsOptional()
+  @IsBoolean()
+  copyServices = true;
 }
 
 export class CreateBarberDto {

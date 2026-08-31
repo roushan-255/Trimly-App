@@ -35,7 +35,10 @@ export interface OwnerVisit {
 
 export interface OwnerShop {
   id: string;
+  brandId: string | null;
+  brandName: string;
   name: string;
+  branchName: string | null;
   description: string | null;
   imageUrl: string | null;
   imageUrls: string[];
@@ -115,6 +118,7 @@ export function addShopBarber(
 
 export type OwnerShopInput = {
   name: string;
+  branchName?: string;
   description?: string;
   imageUrl?: string;
   imageUrls?: string[];
@@ -128,6 +132,30 @@ export type OwnerShopInput = {
   postalCode: string;
   country: string;
 };
+
+export function createOwnerShop(shop: OwnerShopInput) {
+  return ownerRequest<OwnerShop>('/owner/shops', {
+    method: 'POST',
+    body: JSON.stringify(shop),
+  });
+}
+
+export function createOwnerBranch(
+  sourceShopId: string,
+  branch: OwnerShopInput & { branchName: string; copyServices: boolean },
+) {
+  return ownerRequest<OwnerShop>(`/owner/shops/${sourceShopId}/branches`, {
+    method: 'POST',
+    body: JSON.stringify(branch),
+  });
+}
+
+export function archiveOwnerShop(shopId: string) {
+  return ownerRequest<{ shopId: string; status: 'ARCHIVED' }>(
+    `/owner/shops/${shopId}`,
+    { method: 'DELETE' },
+  );
+}
 
 export function updateOwnerShop(shopId: string, shop: OwnerShopInput) {
   return ownerRequest<OwnerShop>(`/owner/shops/${shopId}`, {

@@ -113,8 +113,22 @@ model ShopOwnerProfile {
 
   user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   shops             Shop[]
+  salonBrands       SalonBrand[]
   payoutAccounts    PayoutAccount[]
   barberInvitations ShopBarberMembership[] @relation("BarberMembershipInviter")
+}
+
+model SalonBrand {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner  ShopOwnerProfile @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  shops  Shop[]
+
+  @@index([ownerId])
 }
 
 model AdminProfile {
@@ -134,7 +148,9 @@ model AdminProfile {
 model Shop {
   id           String   @id @default(uuid()) @db.Uuid
   ownerId      String   @db.Uuid
+  brandId      String?  @db.Uuid
   name         String
+  branchName   String?
   description  String?
   imageUrl     String?
   imageUrls    String[] @default([])
@@ -150,10 +166,12 @@ model Shop {
   timezone     String   @default("Asia/Kolkata")
   latitude     Decimal? @db.Decimal(9, 6)
   longitude    Decimal? @db.Decimal(9, 6)
+  archivedAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   owner             ShopOwnerProfile       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  brand             SalonBrand?            @relation(fields: [brandId], references: [id], onDelete: SetNull)
   barberMemberships ShopBarberMembership[]
   services          Service[]
   appointments      Appointment[]
@@ -161,6 +179,8 @@ model Shop {
   favoritedBy       FavoriteShop[]
 
   @@index([ownerId])
+  @@index([brandId])
+  @@index([archivedAt])
   @@index([locality])
   @@index([city])
 }

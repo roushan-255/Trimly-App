@@ -26,6 +26,8 @@ import { CreateBookingDto } from "./dto/create-booking.dto";
 const publicShopSelect = {
   id: true,
   name: true,
+  branchName: true,
+  brand: { select: { id: true, name: true } },
   description: true,
   imageUrl: true,
   imageUrls: true,
@@ -101,6 +103,7 @@ export class ShopsService {
     const term = this.locationTerm(query.query);
     const locations = await this.prisma.shop.findMany({
       where: {
+        archivedAt: null,
         locality: { not: null },
         ...(term
           ? {
@@ -137,9 +140,12 @@ export class ShopsService {
     const services = await this.prisma.service.findMany({
       where: {
         isActive: true,
-        ...(locationTerm
-          ? { shop: { OR: this.locationConditions(locationTerm) } }
-          : {}),
+        shop: {
+          archivedAt: null,
+          ...(locationTerm
+            ? { OR: this.locationConditions(locationTerm) }
+            : {}),
+        },
       },
       distinct: ["name"],
       orderBy: { name: "asc" },
@@ -193,8 +199,8 @@ export class ShopsService {
   }
 
   async getById(shopId: string) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id: shopId },
+    const shop = await this.prisma.shop.findFirst({
+      where: { id: shopId, archivedAt: null },
       select: publicShopSelect,
     });
 
@@ -206,8 +212,8 @@ export class ShopsService {
   }
 
   async reviews(shopId: string) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id: shopId },
+    const shop = await this.prisma.shop.findFirst({
+      where: { id: shopId, archivedAt: null },
       select: {
         id: true,
         name: true,
@@ -253,6 +259,7 @@ export class ShopsService {
         shopId,
         barberId,
         status: BarberMembershipStatus.ACTIVE,
+        shop: { archivedAt: null },
       },
       select: {
         barber: {
@@ -312,6 +319,7 @@ export class ShopsService {
         shopId,
         barberId,
         status: BarberMembershipStatus.ACTIVE,
+        shop: { archivedAt: null },
       },
       select: {
         barber: {
@@ -451,6 +459,7 @@ export class ShopsService {
                 shopId,
                 barberId,
                 status: BarberMembershipStatus.ACTIVE,
+                shop: { archivedAt: null },
               },
               select: {
                 id: true,
@@ -598,7 +607,7 @@ export class ShopsService {
   }
 
   private searchWhere(query: ShopSearchDto): Prisma.ShopWhereInput | undefined {
-    const conditions: Prisma.ShopWhereInput[] = [];
+    const conditions: Prisma.ShopWhereInput[] = [{ archivedAt: null }];
     const location = this.locationTerm(query.location);
 
     if (location) {
@@ -735,6 +744,9 @@ export class ShopsService {
     return {
       id: shop.id,
       name: shop.name,
+      brandId: shop.brand?.id ?? null,
+      brandName: shop.brand?.name ?? shop.name,
+      branchName: shop.branchName,
       description: shop.description,
       imageUrl: shop.imageUrl,
       imageUrls: shop.imageUrls,

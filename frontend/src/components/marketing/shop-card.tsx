@@ -13,6 +13,19 @@ export function ShopCard({ shop }: { shop: PublicShop }) {
       : [];
   const [activeGalleryImage, setActiveGalleryImage] = useState(0);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const branchLocation = [shop.locality, shop.city]
+    .filter(
+      (part): part is string =>
+        Boolean(part) &&
+        part?.toLowerCase() !== shop.branchName?.toLowerCase(),
+    )
+    .join(', ');
+  const locationLabel = [
+    shop.branchName ? `${shop.branchName} branch` : null,
+    branchLocation,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const showGalleryImage = (index: number) => {
     const gallery = galleryRef.current;
@@ -50,7 +63,7 @@ export function ShopCard({ shop }: { shop: PublicShop }) {
         </div>
       )}
     </div>
-    <div className="p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-extrabold tracking-tight text-slate-900">{shop.name}</h3><p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><MapPin className="size-3.5 text-emerald-600" /> {[shop.locality, shop.city].filter(Boolean).join(', ')}</p></div><span className="shrink-0 text-sm font-bold text-emerald-700">{shop.startingPrice ? `From ₹${shop.startingPrice}` : 'New'}</span></div>
+    <div className="p-5"><div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-extrabold tracking-tight text-slate-900">{shop.brandName}</h3><p className="mt-1 flex items-center gap-1 text-sm text-slate-500"><MapPin className="size-3.5 text-emerald-600" /> {locationLabel}</p></div><span className="shrink-0 text-sm font-bold text-emerald-700">{shop.startingPrice ? `From ₹${shop.startingPrice}` : 'New'}</span></div>
       <div className="my-4 grid grid-cols-2 gap-2 border-y border-slate-100 py-3 text-center text-xs"><span className="flex flex-col items-center gap-1 text-slate-500"><Users className="size-4 text-emerald-600" /><b className="text-slate-800">{shop.barberCount}</b> {shop.barberCount === 1 ? 'barber' : 'barbers'}</span><span className="flex flex-col items-center gap-1 text-slate-500"><Scissors className="size-4 text-emerald-600" /><b className="text-slate-800">{shop.serviceCount}</b> {shop.serviceCount === 1 ? 'service' : 'services'}</span></div>
       <Link href={`/shops/${shop.id}`} className="inline-flex w-full justify-center rounded-xl border border-emerald-600 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">View Shop</Link>
     </div>

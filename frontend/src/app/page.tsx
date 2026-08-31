@@ -9,8 +9,8 @@ export default function HomePage() {
     <main className="min-h-screen overflow-x-hidden bg-stone-50 text-slate-900">
       <Navbar />
       <HeroSection />
-      <TrustFeatures />
       <TopShopsPreview />
+      <TrustFeatures />
       <Footer />
     </main>
   );

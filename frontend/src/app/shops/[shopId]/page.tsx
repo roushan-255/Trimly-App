@@ -116,7 +116,12 @@ export default function ShopPage() {
                 {shop.rating === null ? <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">New on Trimly</span> : <button type="button" onClick={() => setReviewsOpen(true)} className="group relative isolate flex items-center gap-1 px-1 py-1 text-sm font-bold text-amber-600 transition-colors duration-200 before:pointer-events-none before:absolute before:-inset-x-1 before:-inset-y-1 before:-z-10 before:rounded-full before:bg-amber-200/0 before:blur-sm before:transition-colors before:duration-200 hover:text-amber-700 hover:before:bg-amber-200/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"><Star className="size-4 fill-current transition-transform duration-200 group-hover:scale-110" /> {shop.rating} · {shop.reviewCount} reviews</button>}
                 {shop.verified && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700"><BadgeCheck className="size-4" /> Verified</span>}
               </div>
-              <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl">{shop.name}</h1>
+              <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.045em] text-slate-950 sm:text-5xl">{shop.brandName}</h1>
+              {shop.branchName && (
+                <p className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
+                  {shop.branchName} branch
+                </p>
+              )}
               <p className="mt-4 max-w-2xl leading-7 text-slate-600">
                 {shop.description || 'This shop has recently joined Trimly. More information will be added by the owner soon.'}
               </p>

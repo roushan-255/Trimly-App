@@ -22,3 +22,6 @@ backend/src/generated/prisma/
 
 # Locally uploaded development media
 backend/uploads/
+
+# Locally generated demo captures and videos
+demo-video/

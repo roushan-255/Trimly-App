@@ -17,6 +17,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { UserRole } from "../generated/prisma/enums";
 import {
   CreateBarberDto,
+  CreateBranchDto,
   CreateServiceDto,
   CreateShopDto,
   UpdateBarberDto,
@@ -50,6 +51,23 @@ export class OwnerController {
     @Body() dto: CreateShopDto,
   ) {
     return this.owners.updateShop(user, shopId, dto);
+  }
+
+  @Delete("shops/:shopId")
+  archiveShop(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("shopId", ParseUUIDPipe) shopId: string,
+  ) {
+    return this.owners.archiveShop(user, shopId);
+  }
+
+  @Post("shops/:shopId/branches")
+  createBranch(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("shopId", ParseUUIDPipe) shopId: string,
+    @Body() dto: CreateBranchDto,
+  ) {
+    return this.owners.createBranch(user, shopId, dto);
   }
 
   @Post("shops/:shopId/barbers")

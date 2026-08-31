@@ -41,6 +41,9 @@ import {
   OwnerVisit,
   addShopService,
   addShopBarber,
+  archiveOwnerShop,
+  createOwnerBranch,
+  createOwnerShop,
   deactivateShopService,
   getOwnerShops,
   getOwnerVisits,
@@ -64,6 +67,11 @@ function initials(name: string) {
     .toUpperCase();
 }
 
+function shopDisplayName(shop: OwnerShop) {
+  const branch = shop.branchName ?? shop.locality;
+  return branch ? `${shop.brandName} — ${branch}` : shop.brandName;
+}
+
 export default function OwnerDashboardPage() {
   const router = useRouter();
   const [shops, setShops] = useState<OwnerShop[]>([]);
@@ -77,6 +85,11 @@ export default function OwnerDashboardPage() {
   const [isRemovingBarber, setIsRemovingBarber] = useState(false);
   const [barberActionError, setBarberActionError] = useState('');
   const [showEditShop, setShowEditShop] = useState(false);
+  const [showAddShop, setShowAddShop] = useState(false);
+  const [showAddBranch, setShowAddBranch] = useState(false);
+  const [deletingShop, setDeletingShop] = useState<OwnerShop | null>(null);
+  const [isDeletingShop, setIsDeletingShop] = useState(false);
+  const [deleteShopError, setDeleteShopError] = useState('');
   const [showAddService, setShowAddService] = useState(false);
   const [editingService, setEditingService] = useState<OwnerService | null>(null);
   const [serviceActionId, setServiceActionId] = useState('');
@@ -120,6 +133,9 @@ export default function OwnerDashboardPage() {
   );
   const barberCount = shops.reduce((total, shop) => total + shop.barbers.length, 0);
   const activeServiceCount = activeShop?.services.filter((service) => service.isActive).length ?? 0;
+  const activeBrandBranchCount = activeShop?.brandId
+    ? shops.filter((shop) => shop.brandId === activeShop.brandId).length
+    : 1;
 
   useEffect(() => {
     if (!activeShop?.id) return;
@@ -174,8 +190,23 @@ export default function OwnerDashboardPage() {
 
   const replaceShop = (updatedShop: OwnerShop) => {
     setShops((current) =>
-      current.map((shop) => (shop.id === updatedShop.id ? updatedShop : shop)),
+      current.map((shop) => {
+        if (shop.id === updatedShop.id) return updatedShop;
+        if (updatedShop.brandId && shop.brandId === updatedShop.brandId) {
+          return {
+            ...shop,
+            name: updatedShop.name,
+            brandName: updatedShop.brandName,
+          };
+        }
+        return shop;
+      }),
     );
+  };
+
+  const addCreatedShop = (shop: OwnerShop) => {
+    setShops((current) => [...current, shop]);
+    setActiveShopId(shop.id);
   };
 
   const addServiceToShop = (service: OwnerService) => {
@@ -258,6 +289,30 @@ export default function OwnerDashboardPage() {
     }
   };
 
+  const confirmDeleteShop = async () => {
+    if (!deletingShop) return;
+    setIsDeletingShop(true);
+    setDeleteShopError('');
+    try {
+      await archiveOwnerShop(deletingShop.id);
+      const remaining = shops.filter((shop) => shop.id !== deletingShop.id);
+      const nextShop =
+        remaining.find((shop) => shop.brandId === deletingShop.brandId) ??
+        remaining[0];
+      setShops(remaining);
+      setActiveShopId(nextShop?.id ?? '');
+      setDeletingShop(null);
+    } catch (caught: unknown) {
+      setDeleteShopError(
+        caught instanceof AuthApiError
+          ? caught.message
+          : 'Unable to delete this shop.',
+      );
+    } finally {
+      setIsDeletingShop(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f6f7f4] text-slate-950 lg:grid lg:grid-cols-[270px_1fr]">
       <aside className="hidden min-h-screen border-r border-white/10 bg-[#0d2231] p-6 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:self-start lg:flex-col lg:overflow-hidden">
@@ -314,11 +369,20 @@ export default function OwnerDashboardPage() {
                 <label className="relative hidden sm:block">
                   <span className="sr-only">Active shop</span>
                   <select value={activeShop.id} onChange={(event) => setActiveShopId(event.target.value)} className="h-11 appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-bold outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100">
-                    {shops.map((shop) => <option key={shop.id} value={shop.id}>{shop.name}</option>)}
+                    {shops.map((shop) => <option key={shop.id} value={shop.id}>{shopDisplayName(shop)}</option>)}
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-3 top-3.5 size-4 text-slate-400" />
                 </label>
               )}
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => setShowAddShop(true)}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-50 sm:px-4"
+              >
+                <Plus className="size-4" />
+                <span className="hidden sm:inline">Add shop</span>
+              </button>
               <button type="button" onClick={() => setMobileNav((current) => !current)} className="grid size-11 place-items-center rounded-xl border border-slate-200 bg-white lg:hidden" aria-label="Toggle owner menu">
                 {mobileNav ? <X className="size-5" /> : <Menu className="size-5" />}
               </button>
@@ -326,6 +390,14 @@ export default function OwnerDashboardPage() {
           </div>
           {mobileNav && (
             <div className="border-t border-slate-100 bg-white px-5 py-4 lg:hidden">
+              {activeShop && (
+                <label className="mb-4 grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-400 sm:hidden">
+                  Active shop
+                  <select value={activeShop.id} onChange={(event) => { setActiveShopId(event.target.value); setMobileNav(false); }} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none focus:border-emerald-600">
+                    {shops.map((shop) => <option key={shop.id} value={shop.id}>{shopDisplayName(shop)}</option>)}
+                  </select>
+                </label>
+              )}
               <p className="truncate text-sm text-slate-500">{ownerEmail}</p>
               <button type="button" onClick={logout} className="mt-3 flex items-center gap-2 text-sm font-bold text-rose-600">
                 <LogOut className="size-4" /> Log out
@@ -351,8 +423,8 @@ export default function OwnerDashboardPage() {
             <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
               <Building2 className="mx-auto size-10 text-emerald-600" />
               <h2 className="mt-4 text-2xl font-extrabold">No shop is connected yet</h2>
-              <p className="mt-2 text-slate-500">Create a new owner account with a shop to begin.</p>
-              <Link href="/owner/register" className="mt-6 inline-flex rounded-xl bg-[#0d2231] px-5 py-3 text-sm font-bold text-white">Register a shop</Link>
+              <p className="mt-2 text-slate-500">Add your first location to begin managing your business.</p>
+              <button type="button" onClick={() => setShowAddShop(true)} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#0d2231] px-5 py-3 text-sm font-bold text-white"><Plus className="size-4" /> Add your first shop</button>
             </div>
           ) : (
             <>
@@ -361,16 +433,26 @@ export default function OwnerDashboardPage() {
                   <div>
                     <p className="text-sm font-bold text-emerald-700">Welcome back</p>
                     <h2 className="mt-1 text-3xl font-extrabold tracking-[-0.04em] sm:text-4xl">
-                      {activeShop.name}
+                      {activeShop.brandName}
                     </h2>
+                    {(activeShop.branchName || activeShop.locality) && (
+                      <p className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                        {activeShop.branchName ?? activeShop.locality} branch
+                      </p>
+                    )}
                     <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
                       <MapPin className="size-4 text-emerald-600" />
                       {[activeShop.addressLine1, activeShop.city, activeShop.state].filter(Boolean).join(', ')}
                     </p>
                   </div>
-                  <button type="button" onClick={() => setShowAddBarber(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d2231] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#173b4c]">
-                    <UserPlus className="size-4" /> Add a barber
-                  </button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button type="button" onClick={() => setShowAddBranch(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-5 py-3 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
+                      <Building2 className="size-4" /> Add branch
+                    </button>
+                    <button type="button" onClick={() => setShowAddBarber(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0d2231] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/15 transition hover:bg-[#173b4c]">
+                      <UserPlus className="size-4" /> Add a barber
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -517,6 +599,7 @@ export default function OwnerDashboardPage() {
                       <h2 className="mt-2 text-xl font-extrabold">Shop profile</h2>
                     </div>
                     <div className="flex items-center gap-3">
+                      <button type="button" onClick={() => { setDeleteShopError(''); setDeletingShop(activeShop); }} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-bold text-rose-600 transition hover:bg-rose-50 hover:text-rose-700"><Trash2 className="size-4" /> {activeBrandBranchCount > 1 ? 'Delete branch' : 'Delete shop'}</button>
                       <button type="button" onClick={() => setShowEditShop(true)} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"><Pencil className="size-4" /> Edit</button>
                       <Link href={`/shops/${activeShop.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-emerald-700">View listing <ArrowUpRight className="size-4" /></Link>
                     </div>
@@ -562,12 +645,37 @@ export default function OwnerDashboardPage() {
         />
       )}
       {showEditShop && activeShop && (
-        <EditShopPanel
+        <ShopPanel
           shop={activeShop}
           onClose={() => setShowEditShop(false)}
-          onUpdated={(shop) => {
+          onSaved={(shop) => {
             replaceShop(shop);
             setShowEditShop(false);
+          }}
+        />
+      )}
+      {showAddShop && (
+        <ShopPanel
+          onClose={() => setShowAddShop(false)}
+          onSaved={(shop) => {
+            addCreatedShop(shop);
+            setShowAddShop(false);
+          }}
+        />
+      )}
+      {showAddBranch && activeShop && (
+        <ShopPanel
+          branchOf={activeShop}
+          onClose={() => setShowAddBranch(false)}
+          onSaved={(shop) => {
+            addCreatedShop(shop);
+            setShowAddBranch(false);
+            void getOwnerShops()
+              .then((ownerShops) => {
+                setShops(ownerShops);
+                setActiveShopId(shop.id);
+              })
+              .catch(() => undefined);
           }}
         />
       )}
@@ -603,6 +711,21 @@ export default function OwnerDashboardPage() {
             <div className="mt-7 flex gap-3">
               <button type="button" disabled={isRemovingBarber} onClick={() => setRemovingBarber(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50">Keep barber</button>
               <button type="button" disabled={isRemovingBarber} onClick={() => void confirmRemoveBarber()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60">{isRemovingBarber && <LoaderCircle className="size-4 animate-spin" />}{isRemovingBarber ? 'Removing…' : 'Remove'}</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {deletingShop && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-shop-title">
+          <button type="button" className="absolute inset-0 cursor-default" onClick={() => !isDeletingShop && setDeletingShop(null)} aria-label="Close delete shop confirmation" />
+          <section className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
+            <span className="grid size-12 place-items-center rounded-2xl bg-rose-50 text-rose-600"><Trash2 className="size-5" /></span>
+            <h2 id="delete-shop-title" className="mt-5 text-2xl font-extrabold">{activeBrandBranchCount > 1 ? `Delete ${deletingShop.branchName ?? deletingShop.locality ?? 'this'} branch?` : `Delete ${deletingShop.brandName}?`}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">This {activeBrandBranchCount > 1 ? 'branch' : 'shop'} will be removed from your dashboard and public listings. Its previous bookings and reviews will be preserved.</p>
+            {deleteShopError && <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{deleteShopError}</p>}
+            <div className="mt-7 flex gap-3">
+              <button type="button" disabled={isDeletingShop} onClick={() => setDeletingShop(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50">Keep {activeBrandBranchCount > 1 ? 'branch' : 'shop'}</button>
+              <button type="button" disabled={isDeletingShop} onClick={() => void confirmDeleteShop()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60">{isDeletingShop && <LoaderCircle className="size-4 animate-spin" />}{isDeletingShop ? 'Deleting…' : `Delete ${activeBrandBranchCount > 1 ? 'branch' : 'shop'}`}</button>
             </div>
           </section>
         </div>
@@ -783,31 +906,45 @@ function EditBarberPanel({
   );
 }
 
-function EditShopPanel({
+function ShopPanel({
   shop,
+  branchOf,
   onClose,
-  onUpdated,
+  onSaved,
 }: {
-  shop: OwnerShop;
+  shop?: OwnerShop;
+  branchOf?: OwnerShop;
   onClose: () => void;
-  onUpdated: (shop: OwnerShop) => void;
+  onSaved: (shop: OwnerShop) => void;
 }) {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageUrls, setImageUrls] = useState(
-    shop.imageUrls.length ? shop.imageUrls : shop.imageUrl ? [shop.imageUrl] : [],
+    shop?.imageUrls.length
+      ? shop.imageUrls
+      : shop?.imageUrl
+        ? [shop.imageUrl]
+        : [],
   );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const value = (name: string) => String(form.get(name) ?? '').trim();
-    const name = value('name');
+    const name = branchOf ? branchOf.brandName : value('name');
+    const branchName = value('branchName');
     const addressLine1 = value('addressLine1');
     const city = value('city');
     const postalCode = value('postalCode');
     const country = value('country');
-    if (!name || !addressLine1 || !city || !postalCode || !country) {
+    if (
+      !name ||
+      (branchOf && !branchName) ||
+      !addressLine1 ||
+      !city ||
+      !postalCode ||
+      !country
+    ) {
       setError('Complete the required shop and address fields.');
       return;
     }
@@ -815,8 +952,9 @@ function EditShopPanel({
     setIsSubmitting(true);
     setError('');
     try {
-      const updated = await updateOwnerShop(shop.id, {
+      const input = {
         name,
+        ...(branchName && { branchName }),
         description: value('description'),
         imageUrl: imageUrls[0] ?? '',
         imageUrls,
@@ -829,13 +967,22 @@ function EditShopPanel({
         state: value('state'),
         postalCode,
         country,
-      });
-      onUpdated(updated);
+      };
+      const saved = branchOf
+        ? await createOwnerBranch(branchOf.id, {
+            ...input,
+            branchName,
+            copyServices: form.get('copyServices') === 'on',
+          })
+        : shop
+          ? await updateOwnerShop(shop.id, input)
+          : await createOwnerShop(input);
+      onSaved(saved);
     } catch (caught: unknown) {
       setError(
         caught instanceof AuthApiError
           ? caught.message
-          : 'Unable to update this shop.',
+          : `Unable to ${shop ? 'update' : 'create'} this ${branchOf ? 'branch' : 'shop'}.`,
       );
     } finally {
       setIsSubmitting(false);
@@ -843,25 +990,44 @@ function EditShopPanel({
   }
 
   return (
-    <DashboardPanel title="Edit shop profile" eyebrow="Public information" description="Keep the details customers see on your Trimly listing up to date." onClose={onClose}>
+    <DashboardPanel
+      title={shop ? 'Edit shop profile' : branchOf ? 'Add a branch' : 'Add another shop'}
+      eyebrow={shop ? 'Public information' : branchOf ? branchOf.brandName : 'New business location'}
+      description={shop ? 'Keep the details customers see on your Trimly listing up to date.' : branchOf ? 'Add another location under the same salon brand. Its team, visits, and profile remain independent.' : 'Create a separate listing, team, services, and visit-notice space for this location.'}
+      onClose={onClose}
+    >
       <form onSubmit={submit} className="mt-8 grid gap-5">
-        <DashboardField label="Shop name" name="name" defaultValue={shop.name} />
-        <label className="grid gap-2 text-sm font-bold text-slate-700">Description <span className="font-medium text-slate-400">(optional)</span><textarea name="description" defaultValue={shop.description ?? ''} className="min-h-28 resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" /></label>
+        {branchOf ? (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Salon brand</p>
+            <p className="mt-1 text-lg font-extrabold text-slate-900">{branchOf.brandName}</p>
+          </div>
+        ) : (
+          <DashboardField label="Shop name" name="name" defaultValue={shop?.brandName ?? shop?.name ?? ''} />
+        )}
+        <DashboardField label="Branch name" hint={branchOf ? undefined : '(optional)'} name="branchName" defaultValue={branchOf ? '' : shop?.branchName ?? ''} placeholder="Gachibowli" />
+        <label className="grid gap-2 text-sm font-bold text-slate-700">Description <span className="font-medium text-slate-400">(optional)</span><textarea name="description" defaultValue={shop?.description ?? branchOf?.description ?? ''} className="min-h-28 resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" /></label>
         <ShopImageField value={imageUrls} onChange={setImageUrls} />
         <div className="grid gap-5 sm:grid-cols-2">
-          <DashboardField label="Shop email" hint="(optional)" name="email" type="email" defaultValue={shop.email ?? ''} />
-          <DashboardField label="Shop phone" hint="(optional)" name="phone" type="tel" defaultValue={shop.phone ?? ''} />
+          <DashboardField label="Shop email" hint="(optional)" name="email" type="email" defaultValue={shop?.email ?? ''} />
+          <DashboardField label="Shop phone" hint="(optional)" name="phone" type="tel" defaultValue={shop?.phone ?? ''} />
         </div>
-        <DashboardField label="Address line 1" name="addressLine1" defaultValue={shop.addressLine1} />
-        <DashboardField label="Address line 2" hint="(optional)" name="addressLine2" defaultValue={shop.addressLine2 ?? ''} />
+        <DashboardField label="Address line 1" name="addressLine1" defaultValue={shop?.addressLine1 ?? ''} />
+        <DashboardField label="Address line 2" hint="(optional)" name="addressLine2" defaultValue={shop?.addressLine2 ?? ''} />
         <div className="grid gap-5 sm:grid-cols-2">
-          <DashboardField label="Locality" hint="(optional)" name="locality" defaultValue={shop.locality ?? ''} />
-          <DashboardField label="City" name="city" defaultValue={shop.city} />
-          <DashboardField label="State" hint="(optional)" name="state" defaultValue={shop.state ?? ''} />
-          <DashboardField label="Postal code" name="postalCode" defaultValue={shop.postalCode} />
+          <DashboardField label="Locality" hint="(optional)" name="locality" defaultValue={shop?.locality ?? ''} />
+          <DashboardField label="City" name="city" defaultValue={shop?.city ?? branchOf?.city ?? ''} />
+          <DashboardField label="State" hint="(optional)" name="state" defaultValue={shop?.state ?? branchOf?.state ?? ''} />
+          <DashboardField label="Postal code" name="postalCode" defaultValue={shop?.postalCode ?? ''} />
         </div>
-        <DashboardField label="Country" name="country" defaultValue={shop.country} />
-        <PanelActions error={error} submitting={isSubmitting} onClose={onClose} submitLabel="Save shop" submittingLabel="Saving…" />
+        <DashboardField label="Country" name="country" defaultValue={shop?.country ?? branchOf?.country ?? 'India'} />
+        {branchOf && (
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 p-4 text-sm text-slate-600">
+            <input type="checkbox" name="copyServices" defaultChecked className="mt-0.5 size-4 accent-emerald-600" />
+            <span><strong className="block text-slate-900">Copy services and prices</strong><span className="mt-1 block leading-5">Start this branch with the services currently configured at {shopDisplayName(branchOf)}. You can edit them independently afterward.</span></span>
+          </label>
+        )}
+        <PanelActions error={error} submitting={isSubmitting} onClose={onClose} submitLabel={shop ? 'Save shop' : branchOf ? 'Create branch' : 'Create shop'} submittingLabel={shop ? 'Saving…' : branchOf ? 'Creating branch…' : 'Creating…'} />
       </form>
     </DashboardPanel>
   );

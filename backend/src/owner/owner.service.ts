@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -15,6 +16,7 @@ import { PasswordService } from "../auth/password.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   CreateBarberDto,
+  CreateBranchDto,
   CreateServiceDto,
   CreateShopDto,
   UpdateBarberDto,
@@ -41,7 +43,9 @@ const ownerServiceSelect = {
 
 const ownerShopSelect = {
   id: true,
+  brandId: true,
   name: true,
+  branchName: true,
   description: true,
   imageUrl: true,
   imageUrls: true,
@@ -55,6 +59,7 @@ const ownerShopSelect = {
   postalCode: true,
   country: true,
   createdAt: true,
+  brand: { select: { id: true, name: true } },
   services: {
     orderBy: { createdAt: "asc" as const },
     select: ownerServiceSelect,
@@ -84,7 +89,7 @@ export class OwnerService {
   async listShops(user: AuthenticatedUser) {
     this.assertOwner(user);
     const shops = await this.prisma.shop.findMany({
-      where: { owner: { userId: user.id } },
+      where: { owner: { userId: user.id }, archivedAt: null },
       orderBy: { createdAt: "asc" },
       select: ownerShopSelect,
     });
@@ -99,11 +104,134 @@ export class OwnerService {
     });
     if (!owner) throw new NotFoundException("Shop owner profile not found");
 
-    const shop = await this.prisma.shop.create({
-      data: { ownerId: owner.id, ...this.shopData(dto) },
-      select: ownerShopSelect,
+    const shop = await this.prisma.$transaction(async (transaction) => {
+      const brand = await transaction.salonBrand.create({
+        data: { ownerId: owner.id, name: dto.name },
+        select: { id: true },
+      });
+      return transaction.shop.create({
+        data: {
+          ownerId: owner.id,
+          brandId: brand.id,
+          ...this.shopData(dto),
+          branchName: dto.branchName ?? this.defaultBranchName(dto),
+        },
+        select: ownerShopSelect,
+      });
     });
     return this.toOwnerShop(shop);
+  }
+
+  async createBranch(
+    user: AuthenticatedUser,
+    sourceShopId: string,
+    dto: CreateBranchDto,
+  ) {
+    this.assertOwner(user);
+    if (!dto.branchName?.trim()) {
+      throw new BadRequestException("Branch name is required");
+    }
+    const source = await this.prisma.shop.findFirst({
+      where: {
+        id: sourceShopId,
+        owner: { userId: user.id },
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        ownerId: true,
+        brandId: true,
+        branchName: true,
+        locality: true,
+        city: true,
+        name: true,
+        brand: { select: { name: true } },
+        services: {
+          select: {
+            name: true,
+            description: true,
+            durationMin: true,
+            price: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+    if (!source) throw new NotFoundException("Shop not found");
+
+    try {
+      const branch = await this.prisma.$transaction(async (transaction) => {
+        let brandId = source.brandId;
+        const brandName = source.brand?.name ?? source.name;
+        if (!brandId) {
+          const brand = await transaction.salonBrand.create({
+            data: { ownerId: source.ownerId, name: source.name },
+            select: { id: true },
+          });
+          brandId = brand.id;
+          await transaction.shop.update({
+            where: { id: source.id },
+            data: {
+              brandId,
+              branchName:
+                source.branchName ??
+                source.locality ??
+                source.city ??
+                "Main branch",
+            },
+          });
+        }
+
+        const duplicate = await transaction.shop.findFirst({
+          where: {
+            brandId,
+            archivedAt: null,
+            branchName: { equals: dto.branchName, mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+        if (duplicate) {
+          throw new ConflictException(
+            "A branch with this name already exists for this salon",
+          );
+        }
+
+        return transaction.shop.create({
+          data: {
+            ownerId: source.ownerId,
+            brandId,
+            ...this.shopData(dto),
+            name: brandName,
+            branchName: dto.branchName,
+            ...(dto.copyServices && source.services.length
+              ? {
+                  services: {
+                    create: source.services.map((service) => ({
+                      name: service.name,
+                      description: service.description,
+                      durationMin: service.durationMin,
+                      price: service.price,
+                      isActive: service.isActive,
+                    })),
+                  },
+                }
+              : {}),
+          },
+          select: ownerShopSelect,
+        });
+      });
+      return this.toOwnerShop(branch);
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "A branch with this name already exists for this salon",
+        );
+      }
+      throw error;
+    }
   }
 
   async updateShop(
@@ -111,28 +239,49 @@ export class OwnerService {
     shopId: string,
     dto: CreateShopDto,
   ) {
+    const ownedShop = await this.getOwnedShop(user, shopId);
+    try {
+      const shop = await this.prisma.$transaction(async (transaction) => {
+        if (ownedShop.brandId) {
+          await transaction.salonBrand.update({
+            where: { id: ownedShop.brandId },
+            data: { name: dto.name },
+          });
+          await transaction.shop.updateMany({
+            where: { brandId: ownedShop.brandId },
+            data: { name: dto.name },
+          });
+        }
+        return transaction.shop.update({
+          where: { id: shopId },
+          data: {
+            ...this.shopData(dto),
+            branchName: dto.branchName ?? ownedShop.branchName,
+          },
+          select: ownerShopSelect,
+        });
+      });
+      return this.toOwnerShop(shop);
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "A branch with this name already exists for this salon",
+        );
+      }
+      throw error;
+    }
+  }
+
+  async archiveShop(user: AuthenticatedUser, shopId: string) {
     await this.getOwnedShop(user, shopId);
-    const shop = await this.prisma.shop.update({
+    await this.prisma.shop.update({
       where: { id: shopId },
-      data: {
-        name: dto.name,
-        description: dto.description ?? null,
-        imageUrl: dto.imageUrls?.[0] ?? dto.imageUrl ?? null,
-        imageUrls:
-          dto.imageUrls ?? (dto.imageUrl ? [dto.imageUrl] : []),
-        phone: dto.phone ?? null,
-        email: dto.email ?? null,
-        addressLine1: dto.addressLine1,
-        addressLine2: dto.addressLine2 ?? null,
-        locality: dto.locality ?? null,
-        city: dto.city,
-        state: dto.state ?? null,
-        postalCode: dto.postalCode,
-        country: dto.country,
-      },
-      select: ownerShopSelect,
+      data: { archivedAt: new Date() },
     });
-    return this.toOwnerShop(shop);
+    return { shopId, status: "ARCHIVED" as const };
   }
 
   async addBarber(
@@ -374,8 +523,17 @@ export class OwnerService {
   private async getOwnedShop(user: AuthenticatedUser, shopId: string) {
     this.assertOwner(user);
     const shop = await this.prisma.shop.findFirst({
-      where: { id: shopId, owner: { userId: user.id } },
-      select: { id: true, owner: { select: { id: true } } },
+      where: {
+        id: shopId,
+        owner: { userId: user.id },
+        archivedAt: null,
+      },
+      select: {
+        id: true,
+        brandId: true,
+        branchName: true,
+        owner: { select: { id: true } },
+      },
     });
     if (!shop) throw new NotFoundException("Shop not found");
     return shop;
@@ -392,7 +550,7 @@ export class OwnerService {
         shopId,
         barberId,
         status: BarberMembershipStatus.ACTIVE,
-        shop: { owner: { userId: user.id } },
+        shop: { owner: { userId: user.id }, archivedAt: null },
       },
       select: {
         id: true,
@@ -418,7 +576,7 @@ export class OwnerService {
       where: {
         id: serviceId,
         shopId,
-        shop: { owner: { userId: user.id } },
+        shop: { owner: { userId: user.id }, archivedAt: null },
       },
       select: { id: true },
     });
@@ -451,9 +609,10 @@ export class OwnerService {
   }
 
   private toOwnerShop(shop: OwnerShopPayload) {
-    const { barberMemberships, services, ...shopDetails } = shop;
+    const { barberMemberships, services, brand, ...shopDetails } = shop;
     return {
       ...shopDetails,
+      brandName: brand?.name ?? shop.name,
       barbers: barberMemberships.map(({ barber }) => barber),
       services: services.map((service) => this.toOwnerService(service)),
     };
@@ -468,6 +627,7 @@ export class OwnerService {
   private shopData(dto: CreateShopDto) {
     return {
       name: dto.name,
+      branchName: dto.branchName,
       description: dto.description,
       imageUrl: dto.imageUrls?.[0] ?? dto.imageUrl,
       imageUrls:
@@ -482,5 +642,9 @@ export class OwnerService {
       postalCode: dto.postalCode,
       country: dto.country,
     };
+  }
+
+  private defaultBranchName(dto: CreateShopDto) {
+    return dto.locality ?? dto.city ?? "Main branch";
   }
 }
